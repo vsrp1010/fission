@@ -1,56 +1,55 @@
-/*
-Copyright 2016 The Fission Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package router
 
 import (
-	"context"
-	"log"
-	"net/http"
-	"time"
-
-	"github.com/gorilla/mux"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	k8sCache "k8s.io/client-go/tools/cache"
 
-	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
+	"k8s.io/client-go/rest"
+	"log"
+	"github.com/fission/fission/environments/go/context"
+	"net/http"
+	"github.com/fission/fission"
+	"github.com/gorilla/mux"
+	"time"
 )
 
-type HTTPTriggerSet struct {
-	*functionServiceMap
-	*mutableRouter
+type RecorderSet struct {
+	*functionRecorderMap
+	*mutableRouter				// o_O
 
-	fissionClient     *crd.FissionClient
-	kubeClient        *kubernetes.Clientset
-	executor          *executorClient.Client
-	resolver          *functionReferenceResolver
-	crdClient         *rest.RESTClient
-	triggers          []crd.HTTPTrigger
-	triggerStore      k8sCache.Store
-	triggerController k8sCache.Controller
-	functions         []crd.Function
-	funcStore         k8sCache.Store
-	funcController    k8sCache.Controller
+	fissionClient    *crd.FissionClient
+	kubeClient       *kubernetes.Clientset
+	executor         *executorClient.Client
+	resolver         *functionReferenceResolver
+	crdClient        *rest.RESTClient
+	recorders        []crd.Recorder
+	recorderStore    k8sCache.Store				// TODO: What is this for?
+	recorderController    k8sCache.Controller
 }
 
+// TODO: How many stores should we use?
+func makeRecorderSet(frmap *functionRecorderMap, fissionClient *crd.FissionClient,
+	kubeClient *kubernetes.Clientset, executor *executorClient.Client, crdClient *rest.RESTClient) (*RecorderSet, k8sCache.Store) {
+	recorderSet := &RecorderSet{
+		functionRecorderMap: frmap,
+		recorders: []crd.Recorder{},
+		fissionClient: fissionClient,
+		kubeClient: kubeClient,
+		executor: executor,
+		crdClient: crdClient,
+	}
+	var rStore k8sCache.Store
+	var rController k8sCache.Controller
+	if recorderSet.crdClient != nil {
+		rStore, rController = recorderSet.initRecorderController()
+		recorderSet.recorderStore = rStore
+		recorderSet.recorderController = rController
+	}
+	return recorderSet, rStore
+}
+/*
 func makeHTTPTriggerSet(fmap *functionServiceMap, fissionClient *crd.FissionClient,
 	kubeClient *kubernetes.Clientset, executor *executorClient.Client, crdClient *rest.RESTClient) (*HTTPTriggerSet, k8sCache.Store, k8sCache.Store) {
 	httpTriggerSet := &HTTPTriggerSet{
@@ -73,7 +72,22 @@ func makeHTTPTriggerSet(fmap *functionServiceMap, fissionClient *crd.FissionClie
 	}
 	return httpTriggerSet, tStore, fnStore
 }
+*/
 
+// TODO: Third argument?
+func (rs *RecorderSet) subscribeRouter(ctx context.Context, mr *mutableRouter, resolver *functionReferenceResolver) {
+	rs.resolver = resolver
+	rs.mutableRouter = mr
+	mr.updateRouter(rs.getRouter())
+
+	if rs.fissionClient == nil {
+		// ???
+		return
+	}
+	go rs.runWatcher(ctx, rs.recorderController)
+}
+
+/*
 func (ts *HTTPTriggerSet) subscribeRouter(ctx context.Context, mr *mutableRouter, resolver *functionReferenceResolver) {
 	ts.resolver = resolver
 	ts.mutableRouter = mr
@@ -87,13 +101,39 @@ func (ts *HTTPTriggerSet) subscribeRouter(ctx context.Context, mr *mutableRouter
 	go ts.runWatcher(ctx, ts.funcController)
 	go ts.runWatcher(ctx, ts.triggerController)
 }
+*/
 
-func defaultHomeHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-}
+func (rs *RecorderSet) getRouter() *mux.Router {
+	muxRouter := mux.NewRouter()
 
-func routerHealthHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	for _, recorder := range rs.recorders {
+
+		// Resolve function reference if recorder is tied to function(s)
+		if len(recorder.Spec.Functions) != 0 {
+			for _, functionRef := range recorder.Spec.Functions {
+				rr, err := rs.resolver.resolve(recorder.Metadata.Namespace, &functionRef)
+				if err != nil {
+					// Unresolvable function reference. Report the error via the recorder's status.
+					go rs.updateRecorderStatusFailed(&recorder, err)
+
+					continue
+				}
+				if rr.resolveResultType != resolveResultSingleFunction {
+					// not implemented yet
+					log.Panicf("resolve result type not implemented (%v)", rr.resolveResultType)
+				}
+			}
+		}
+
+		// Resolve trigger reference is recorder is tied to trigger(s)
+
+		if len(recorder.Spec.Triggers) != 0 {
+
+		}
+
+		// TODO function handler?
+
+	}
 }
 
 func (ts *HTTPTriggerSet) getRouter() *mux.Router {
@@ -164,10 +204,26 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	return muxRouter
 }
 
-func (ts *HTTPTriggerSet) updateTriggerStatusFailed(ht *crd.HTTPTrigger, err error) {
-	// TODO
+func (rs *RecorderSet) initRecorderController() (k8sCache.Store, k8sCache.Controller) {
+	resyncPeriod := 30 * time.Second
+	listWatch := k8sCache.NewListWatchFromClient(rs.crdClient, "recorders", metav1.NamespaceAll, fields.Everything())
+	store, controller := k8sCache.NewInformer(listWatch, &crd.Recorder{}, resyncPeriod,
+		k8sCache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+
+			},
+			DeleteFunc: func(obj interface{}) {
+
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+
+			},
+		},
+	)
+	return store, controller
 }
 
+/*
 func (ts *HTTPTriggerSet)  initTriggerController() (k8sCache.Store, k8sCache.Controller) {
 	resyncPeriod := 30 * time.Second
 	listWatch := k8sCache.NewListWatchFromClient(ts.crdClient, "httptriggers", metav1.NamespaceAll, fields.Everything())
@@ -192,60 +248,18 @@ func (ts *HTTPTriggerSet)  initTriggerController() (k8sCache.Store, k8sCache.Con
 		})
 	return store, controller
 }
+*/
 
-func (ts *HTTPTriggerSet) initFunctionController() (k8sCache.Store, k8sCache.Controller) {
-	resyncPeriod := 30 * time.Second
-	listWatch := k8sCache.NewListWatchFromClient(ts.crdClient, "functions", metav1.NamespaceAll, fields.Everything())
-	store, controller := k8sCache.NewInformer(listWatch, &crd.Function{}, resyncPeriod,
-		k8sCache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				ts.syncTriggers()
-			},
-			DeleteFunc: func(obj interface{}) {
-				ts.syncTriggers()
-			},
-			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
-				fn := newObj.(*crd.Function)
-				// update resolver function reference cache
-				for key, rr := range ts.resolver.copy() {
-					if key.functionReference.Name == fn.Metadata.Name &&
-						rr.functionMetadata.ResourceVersion != fn.Metadata.ResourceVersion {
-						err := ts.resolver.delete(key.namespace, &key.functionReference)
-						if err != nil {
-							log.Printf("Error deleting functionReferenceResolver cache: %v", err)
-						}
-						break
-					}
-				}
-				ts.syncTriggers()
-			},
-		})
-	return store, controller
-}
-
-func (ts *HTTPTriggerSet) runWatcher(ctx context.Context, controller k8sCache.Controller) {
+func (rs *RecorderSet) runWatcher(ctx context.Context, controller k8sCache.Controller) {
 	go func() {
 		controller.Run(ctx.Done())
 	}()
 }
 
-func (ts *HTTPTriggerSet) syncTriggers() {
-	// get triggers
-	latestTriggers := ts.triggerStore.List()
-	triggers := make([]crd.HTTPTrigger, len(latestTriggers))
-	for _, t := range latestTriggers {
-		triggers = append(triggers, *t.(*crd.HTTPTrigger))
-	}
-	ts.triggers = triggers
-
-	// get functions
-	latestFunctions := ts.funcStore.List()
-	functions := make([]crd.Function, len(latestFunctions))
-	for _, f := range latestFunctions {
-		functions = append(functions, *f.(*crd.Function))
-	}
-	ts.functions = functions
-
-	// make a new router and use it
-	ts.mutableRouter.updateRouter(ts.getRouter())
+/*
+func (ts *HTTPTriggerSet) runWatcher(ctx context.Context, controller k8sCache.Controller) {
+	go func() {
+		controller.Run(ctx.Done())
+	}()
 }
+*/
