@@ -122,7 +122,8 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 		}
 
 		// TODO: check if this trigger should be recorded
-		if ts.recorderSet.triggerRecorderMap[trigger.Spec.] == true {
+		var doRecord bool
+		if ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name] == true {
 			doRecord = true
 		}
 
@@ -136,7 +137,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			function:    rr.functionMetadata,
 			executor:    ts.executor,
 			httpTrigger: &trigger,
-			record : true
+			doRecord:    doRecord,
 		}
 
 		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)

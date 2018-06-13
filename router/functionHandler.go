@@ -38,6 +38,7 @@ type functionHandler struct {
 	executor    *executorClient.Client
 	function    *metav1.ObjectMeta
 	httpTrigger *crd.HTTPTrigger
+	doRecord    bool
 }
 
 // A layer on top of http.DefaultTransport, with retries.
@@ -215,7 +216,9 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 	for k, v := range vars {
 		request.Header.Add(fmt.Sprintf("X-Fission-Params-%v", k), v)
 	}
-	fh.record == true : do recording
+	if fh.doRecord == true {
+		log.Printf("Recording enabled!")
+	}
 
 	// system params
 	MetadataToHeaders(HEADERS_FISSION_FUNCTION_PREFIX, fh.function, request)

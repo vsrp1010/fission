@@ -25,13 +25,11 @@ type RecorderSet struct {
 // TODO: How many stores should we use?
 // TODO: Originally passed in frmap from router.Start function.
 func MakeRecorderSet(crdClient *rest.RESTClient) (*RecorderSet, k8sCache.Store) {
-	var frmap map[string]bool
-	var trmap map[string]bool
 	var rStore k8sCache.Store
 	var rController k8sCache.Controller
 	recorderSet := &RecorderSet{
-		functionRecorderMap: frmap,
-		triggerRecorderMap: trmap,
+		functionRecorderMap: make(map[string]bool),
+		triggerRecorderMap: make(map[string]bool),
 		crdClient: crdClient,
 		recorders: []crd.Recorder{},
 		recStore: rStore,
