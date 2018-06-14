@@ -1,6 +1,7 @@
 package router
 
 import (
+	"log"
 	"k8s.io/apimachinery/pkg/fields"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sCache "k8s.io/client-go/tools/cache"
@@ -9,6 +10,7 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"time"
+
 )
 
 type RecorderSet struct {
@@ -94,6 +96,8 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 			rs.triggerRecorderMap[trigger.Name] = r
 		}
 	}
+
+	log.Printf("New recorder! ", r.Metadata)
 }
 
 // TODO: Delete or disable?

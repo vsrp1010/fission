@@ -123,7 +123,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 
 		// TODO: check if this trigger should be recorded
 		var doRecord bool
-		if ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name] == true {
+		if ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name] != nil {
 			doRecord = true
 		}
 
