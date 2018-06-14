@@ -6,14 +6,16 @@ import (
 	k8sCache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/rest"
 
+	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"time"
-	"fmt"
 )
 
 type RecorderSet struct {
-	functionRecorderMap  map[string]bool		// TODO: Keep this as is or define in separate file?
-	triggerRecorderMap   map[string]bool
+	parent               *HTTPTriggerSet
+
+	functionRecorderMap  map[string]*crd.Recorder
+	triggerRecorderMap   map[string]*crd.Recorder
 
 	crdClient            *rest.RESTClient
 
@@ -22,14 +24,13 @@ type RecorderSet struct {
 	recController        k8sCache.Controller
 }
 
-// TODO: How many stores should we use?
-// TODO: Originally passed in frmap from router.Start function.
-func MakeRecorderSet(crdClient *rest.RESTClient) (*RecorderSet, k8sCache.Store) {
+func MakeRecorderSet(parent *HTTPTriggerSet, crdClient *rest.RESTClient) (*RecorderSet, k8sCache.Store) {
 	var rStore k8sCache.Store
 	var rController k8sCache.Controller
 	recorderSet := &RecorderSet{
-		functionRecorderMap: make(map[string]bool),
-		triggerRecorderMap: make(map[string]bool),
+		parent: parent,
+		functionRecorderMap: make(map[string]*crd.Recorder),
+		triggerRecorderMap: make(map[string]*crd.Recorder),
 		crdClient: crdClient,
 		recorders: []crd.Recorder{},
 		recStore: rStore,
@@ -45,21 +46,16 @@ func (rs *RecorderSet) initRecorderController() (k8sCache.Store, k8sCache.Contro
 		k8sCache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				recorder := obj.(*crd.Recorder)
-				// Update recorder maps
 				go rs.newRecorder(recorder)
-				// Sync?
 			},
-			DeleteFunc: func(obj interface{}) {				//  When does this get invoked?
+			DeleteFunc: func(obj interface{}) {
 				recorder := obj.(*crd.Recorder)
-				// Update recorder maps
 				go rs.disableRecorder(recorder)
-				// Sync?
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				oldRecorder := oldObj.(*crd.Recorder)
 				newRecorder := newObj.(*crd.Recorder)
 				go rs.updateRecorder(oldRecorder, newRecorder)
-				// Sync?
 			},
 		},
 	)
@@ -71,20 +67,36 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	functions := r.Spec.Functions
 	triggers := r.Spec.Triggers
 
+	// If triggers are not explicitly specified during the creation of this recorder,
+	// keep track of those associated with the function(s) specified [implicitly added triggers]
+	needTrack := len(triggers) == 0
+	var trackFunction map[fission.FunctionReference]bool
+
 	if len(functions) != 0 {
 		for _, function := range functions {
-			rs.functionRecorderMap[function.Name] = true
+			rs.functionRecorderMap[function.Name] = r
+			// If we
+			if needTrack {
+				trackFunction[function] = true
+			}
+		}
+	}
+
+	// Account for implicitly added triggers
+	for _, trigger := range rs.parent.triggers {
+		if trackFunction[trigger.Spec.FunctionReference] {
+			rs.triggerRecorderMap[trigger.Metadata.Name] = r
 		}
 	}
 
 	if len(triggers) != 0 {
 		for _, trigger := range triggers {
-			rs.triggerRecorderMap[trigger.Name] = true
+			rs.triggerRecorderMap[trigger.Name] = r
 		}
 	}
 }
 
-// Delete or disable?
+// TODO: Delete or disable?
 func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	functions := r.Spec.Functions
 	triggers := r.Spec.Triggers
@@ -100,19 +112,22 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 			delete(rs.triggerRecorderMap, trigger.Name)
 		}
 	}
+	// Reset doRecord
+	rs.parent.forceNewRouter()
 }
 
 func (rs *RecorderSet) updateRecorder(old *crd.Recorder, new *crd.Recorder) {
-	stateChange := fmt.Sprintf("%v,%v", old.Spec.Enabled, new.Spec.Enabled)
-	switch stateChange {
-	case "true,false":
-		rs.disableRecorder(new)
-	case "false,true":
+	if new.Spec.Enabled == true {
 		rs.newRecorder(new)
-	case "true,true":
-		rs.newRecorder(new)
-	case "false,false":
+	} else {
 		rs.disableRecorder(new)
 	}
+}
 
+func (rs *RecorderSet) triggerDeleted(trigger *crd.HTTPTrigger) {
+	delete(rs.triggerRecorderMap, trigger.Metadata.Name)
+}
+
+func (rs *RecorderSet) funcDeleted(function *crd.Function) {
+	delete(rs.functionRecorderMap, function.Metadata.Name)
 }
