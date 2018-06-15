@@ -1,7 +1,6 @@
 package router
 
 import (
-	"log"
 	"k8s.io/apimachinery/pkg/fields"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sCache "k8s.io/client-go/tools/cache"
@@ -10,7 +9,6 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"time"
-
 )
 
 type RecorderSet struct {
@@ -28,7 +26,6 @@ type RecorderSet struct {
 
 func MakeRecorderSet(parent *HTTPTriggerSet, crdClient *rest.RESTClient) (*RecorderSet, k8sCache.Store) {
 	var rStore k8sCache.Store
-	var rController k8sCache.Controller
 	recorderSet := &RecorderSet{
 		parent: parent,
 		functionRecorderMap: make(map[string]*crd.Recorder),
@@ -36,8 +33,8 @@ func MakeRecorderSet(parent *HTTPTriggerSet, crdClient *rest.RESTClient) (*Recor
 		crdClient: crdClient,
 		recorders: []crd.Recorder{},
 		recStore: rStore,
-		recController: rController,
 	}
+	_, recorderSet.recController = recorderSet.initRecorderController()
 	return recorderSet, rStore
 }
 
@@ -72,7 +69,7 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	// If triggers are not explicitly specified during the creation of this recorder,
 	// keep track of those associated with the function(s) specified [implicitly added triggers]
 	needTrack := len(triggers) == 0
-	var trackFunction map[fission.FunctionReference]bool
+	trackFunction := make(map[fission.FunctionReference]bool)
 
 	if len(functions) != 0 {
 		for _, function := range functions {
@@ -97,7 +94,6 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 		}
 	}
 
-	log.Printf("New recorder! ", r.Metadata)
 }
 
 // TODO: Delete or disable?
@@ -107,13 +103,15 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 
 	if len(functions) != 0 {
 		for _, function := range functions {
-			delete(rs.functionRecorderMap, function.Name)		// Alternatively set the value to false
+			// delete(rs.functionRecorderMap, function.Name)		// Alternatively set the value to false
+			rs.functionRecorderMap[function.Name] = nil
 		}
 	}
 
 	if len(triggers) != 0 {
 		for _, trigger := range triggers {
-			delete(rs.triggerRecorderMap, trigger.Name)
+			// delete(rs.triggerRecorderMap, trigger.Name)
+			rs.triggerRecorderMap[trigger.Name] = nil
 		}
 	}
 	// Reset doRecord
