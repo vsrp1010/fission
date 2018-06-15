@@ -9,6 +9,7 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 type RecorderSet struct {
@@ -39,22 +40,23 @@ func MakeRecorderSet(parent *HTTPTriggerSet, crdClient *rest.RESTClient) (*Recor
 }
 
 func (rs *RecorderSet) initRecorderController() (k8sCache.Store, k8sCache.Controller) {
-	resyncPeriod := 30 * time.Second
+	resyncPeriod := 100 * time.Second
+	//resyncPeriod := 0 * time.Second
 	listWatch := k8sCache.NewListWatchFromClient(rs.crdClient, "recorders", metav1.NamespaceAll, fields.Everything())
 	store, controller := k8sCache.NewInformer(listWatch, &crd.Recorder{}, resyncPeriod,
 		k8sCache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				recorder := obj.(*crd.Recorder)
-				go rs.newRecorder(recorder)
+				rs.newRecorder(recorder)
 			},
 			DeleteFunc: func(obj interface{}) {
 				recorder := obj.(*crd.Recorder)
-				go rs.disableRecorder(recorder)
+				rs.disableRecorder(recorder)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				oldRecorder := oldObj.(*crd.Recorder)
 				newRecorder := newObj.(*crd.Recorder)
-				go rs.updateRecorder(oldRecorder, newRecorder)
+				rs.updateRecorder(oldRecorder, newRecorder)
 			},
 		},
 	)
@@ -71,6 +73,8 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	needTrack := len(triggers) == 0
 	trackFunction := make(map[fission.FunctionReference]bool)
 
+	log.Info("New recorder ! Need track? ", needTrack)
+
 	if len(functions) != 0 {
 		for _, function := range functions {
 			rs.functionRecorderMap[function.Name] = r
@@ -82,9 +86,12 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	}
 
 	// Account for implicitly added triggers
-	for _, trigger := range rs.parent.triggers {
-		if trackFunction[trigger.Spec.FunctionReference] {
-			rs.triggerRecorderMap[trigger.Metadata.Name] = r
+	if needTrack {
+		for _, t := range rs.parent.triggerStore.List() {
+			trigger := *t.(*crd.HTTPTrigger)
+			if trackFunction[trigger.Spec.FunctionReference] {
+				rs.triggerRecorderMap[trigger.Metadata.Name] = r
+			}
 		}
 	}
 
@@ -94,6 +101,15 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 		}
 	}
 
+	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
+	log.Info("See updated function map: ", keys(rs.functionRecorderMap))
+}
+
+func keys(m map[string]*crd.Recorder) (keys []string) {
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // TODO: Delete or disable?
@@ -101,21 +117,26 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	functions := r.Spec.Functions
 	triggers := r.Spec.Triggers
 
+	log.Info("Disable recorder !")
+
 	if len(functions) != 0 {
 		for _, function := range functions {
-			// delete(rs.functionRecorderMap, function.Name)		// Alternatively set the value to false
-			rs.functionRecorderMap[function.Name] = nil
+			delete(rs.functionRecorderMap, function.Name)		// Alternatively set the value to false
+			//rs.functionRecorderMap[function.Name] = nil
 		}
 	}
 
 	if len(triggers) != 0 {
 		for _, trigger := range triggers {
-			// delete(rs.triggerRecorderMap, trigger.Name)
-			rs.triggerRecorderMap[trigger.Name] = nil
+			delete(rs.triggerRecorderMap, trigger.Name)
+			// rs.triggerRecorderMap[trigger.Name] = nil
 		}
 	}
 	// Reset doRecord
 	rs.parent.forceNewRouter()
+
+	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
+	log.Info("See updated function map: ", keys(rs.functionRecorderMap))
 }
 
 func (rs *RecorderSet) updateRecorder(old *crd.Recorder, new *crd.Recorder) {
