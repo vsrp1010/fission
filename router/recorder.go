@@ -9,7 +9,7 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"time"
-	log "github.com/sirupsen/logrus"
+	"net/http"
 )
 
 type RecorderSet struct {
@@ -37,6 +37,11 @@ func MakeRecorderSet(parent *HTTPTriggerSet, crdClient *rest.RESTClient) (*Recor
 	}
 	_, recorderSet.recController = recorderSet.initRecorderController()
 	return recorderSet, rStore
+}
+
+// Generate a ReqUID, connect to Redis and store the request there
+func beginRecord(function *metav1.ObjectMeta, request *http.Request) {
+
 }
 
 func (rs *RecorderSet) initRecorderController() (k8sCache.Store, k8sCache.Controller) {
@@ -73,7 +78,7 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	needTrack := len(triggers) == 0
 	trackFunction := make(map[fission.FunctionReference]bool)
 
-	log.Info("New recorder ! Need track? ", needTrack)
+	//log.Info("New recorder ! Need track? ", needTrack)
 
 	if len(functions) != 0 {
 		for _, function := range functions {
@@ -101,8 +106,8 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 		}
 	}
 
-	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
-	log.Info("See updated function map: ", keys(rs.functionRecorderMap))
+	//log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
+	//log.Info("See updated function map: ", keys(rs.functionRecorderMap))
 }
 
 func keys(m map[string]*crd.Recorder) (keys []string) {
@@ -117,7 +122,7 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	functions := r.Spec.Functions
 	triggers := r.Spec.Triggers
 
-	log.Info("Disable recorder !")
+	//log.Info("Disabling recorder !")
 
 	if len(functions) != 0 {
 		for _, function := range functions {
@@ -135,8 +140,8 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	// Reset doRecord
 	rs.parent.forceNewRouter()
 
-	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
-	log.Info("See updated function map: ", keys(rs.functionRecorderMap))
+	//log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
+	//log.Info("See updated function map: ", keys(rs.functionRecorderMap))
 }
 
 func (rs *RecorderSet) updateRecorder(old *crd.Recorder, new *crd.Recorder) {

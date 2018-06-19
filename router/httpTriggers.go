@@ -125,11 +125,12 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			continue
 		}
 
-		// TODO: check if this trigger should be recorded
-		var doRecord bool
-		if ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name] != nil {
+		// Check if this trigger should be recorded
+ 		if ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name] != nil {
 			doRecord = true
 		}
+
+		//log.Printf("The trigger %v should be recorded: %v", trigger.Metadata.Name, doRecord)
 
 		if rr.resolveResultType != resolveResultSingleFunction {
 			// not implemented yet
@@ -168,10 +169,17 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	// triggers route into these.
 	for _, function := range ts.functions {
 		m := function.Metadata
+
+		var doRecord bool
+		if ts.recorderSet.functionRecorderMap[m.Name] != nil {
+			doRecord = true
+		}
+
 		fh := &functionHandler{
 			fmap:     ts.functionServiceMap,
 			function: &m,
 			executor: ts.executor,
+			doRecord: doRecord,
 		}
 		muxRouter.HandleFunc(fission.UrlForFunction(function.Metadata.Name, function.Metadata.Namespace), fh.handler)
 	}
@@ -195,6 +203,7 @@ func (ts *HTTPTriggerSet)  initTriggerController() (k8sCache.Store, k8sCache.Con
 				trigger := obj.(*crd.HTTPTrigger)
 				go createIngress(trigger, ts.kubeClient)
 				ts.syncTriggers()
+				// Check if this trigger's function needs to be recorded
 				fnRef := trigger.Spec.FunctionReference.Name
 				recorder := ts.recorderSet.functionRecorderMap[fnRef]
 				if recorder != nil {

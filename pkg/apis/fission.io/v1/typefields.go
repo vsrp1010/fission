@@ -288,6 +288,7 @@ type (
 
 	// TODO: Is this needed?
 	TriggerReference struct {
+		Type 	  string `json:"type"`
 		Name      string `json:"name"`
 	}
 
@@ -311,17 +312,13 @@ type (
 		ContentType       string            `json:"contentType"`
 	}
 
-	// BackendType is the DB/cache where function request/responses are stored
-	BackendType string
-
-	// RecorderSpec defines ...
+	// TODO: Where should Redis/MongoDB be configured? Create helm config file.
 	RecorderSpec struct {
 		Name              string
-		BackendType       BackendType
 		Functions         []FunctionReference
-		Triggers          []TriggerReference
-		RetentionPolicy   string
-		EvictionPolicy    string
+		Triggers          []TriggerReference	// TODO: Need to know type (HTTP, MQ, Time)
+		RetentionPolicy   string				// Max memory AND/OR time
+		EvictionPolicy    string                // TODO: Remove from all places
 		Enabled           bool
 	}
 
