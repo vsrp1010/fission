@@ -31,7 +31,8 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
-	log2 "github.com/sirupsen/logrus"
+	logrus "github.com/sirupsen/logrus"
+	"github.com/fission/fission/redis"
 )
 
 type functionHandler struct {
@@ -218,9 +219,10 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 		request.Header.Add(fmt.Sprintf("X-Fission-Params-%v", k), v)
 	}
 	if fh.doRecord == true {
-		log2.Info("Begin recording!")
+		logrus.Info("Begin recording!")
+		redis.BeginRecord(fh.function, request)
 	} else {
-		log2.Info("Don't begin recording.")
+		logrus.Info("Don't begin recording.")
 	}
 
 	// system params

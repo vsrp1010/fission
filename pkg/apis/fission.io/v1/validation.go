@@ -457,11 +457,14 @@ func (spec MessageQueueTriggerSpec) Validate() error {
 func (spec RecorderSpec) Validate() error {
 	var result *multierror.Error
 
+	// TODO: Figure this out
+	/*
 	switch spec.BackendType {
 	case RecorderBackendTypeRedis, RecorderBackendTypeMongoDB: // no op
 	default:
 		result = multierror.Append(result, MakeValidationErr(ErrorUnsupportedType, "RecorderSpec.BackendType", spec.BackendType, "not a supported backend type"))
 	}
+	*/
 	for _, functionRef := range spec.Functions {
 		result = multierror.Append(result, functionRef.Validate())
 	}

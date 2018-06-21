@@ -79,7 +79,6 @@ func recorderCreate(c *cli.Context) error {
 		},
 		Spec: fission.RecorderSpec{
 			Name:            recName,
-			BackendType:     "redis",		// TODO, where to get this from?
 			Functions:       functions, 	// TODO
 			Triggers:        triggers,		// TODO
 			RetentionPolicy: retPolicy,
@@ -119,9 +118,9 @@ func recorderGet(c *cli.Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-		"NAME", "ENABLED", "BACKEND_TYPE", "FUNCTIONS", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
-	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-			recorder.Metadata.Name, recorder.Spec.Enabled, recorder.Spec.BackendType, recorder.Spec.Functions, recorder.Spec.Triggers, recorder.Spec.RetentionPolicy, recorder.Spec.EvictionPolicy,)
+		"NAME", "ENABLED", "FUNCTIONS", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
+			recorder.Metadata.Name, recorder.Spec.Enabled, recorder.Spec.Functions, recorder.Spec.Triggers, recorder.Spec.RetentionPolicy, recorder.Spec.EvictionPolicy,)
 	w.Flush()
 
 	return nil
@@ -207,11 +206,11 @@ func recorderList(c *cli.Context) error {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
-	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-		"NAME", "ENABLED", "BACKEND_TYPE", "FUNCTIONS", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
+		"NAME", "ENABLED", "FUNCTIONS", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
 	for _, r := range recorders {
-		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-			r.Metadata.Name, r.Spec.Enabled, r.Spec.BackendType, r.Spec.Functions, r.Spec.Triggers, r.Spec.RetentionPolicy, r.Spec.EvictionPolicy,)
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
+			r.Metadata.Name, r.Spec.Enabled, r.Spec.Functions, r.Spec.Triggers, r.Spec.RetentionPolicy, r.Spec.EvictionPolicy,)
 	}
 	w.Flush()
 
