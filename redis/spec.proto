@@ -1,9 +1,13 @@
-syntax = 'proto2';
+syntax = 'proto3';
 
 package redisCache;
 
 message Request {
-     required string Method = 1;
+     string Method = 1;
      map<string, string> URL = 2;
+     map<string, string> Header = 3;
+     string Host = 4;
+     map<string, string> Form = 5;
+     map<string, string> PostForm = 6;
 }
 

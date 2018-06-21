@@ -2,16 +2,15 @@ package redis
 
 import (
 	"net/http"
-	"strconv"
-
 	"github.com/golang/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/gomodule/redigo/redis"
 	log "github.com/sirupsen/logrus"
 	"github.com/fission/fission/redis/build/gen"
+	"strings"
+	"github.com/satori/go.uuid"
+	"fmt"
 )
-
-var generator int 		// Temporary
 
 func NewClient() redis.Conn {
 	c, err := redis.Dial("tcp", "10.103.152.70:6379")
@@ -22,12 +21,33 @@ func NewClient() redis.Conn {
 }
 
 func serializeRequest(request *http.Request) []byte {
-	URL := make(map[string]string)
-	URL["Host"] = request.URL.Host
-	URL["Path"] = request.URL.Path
+	// TODO: Capture more url fields if needed
+	url := make(map[string]string)
+	url["Host"] = request.URL.Host
+	url["Path"] = request.URL.Path
+
+	header := make(map[string]string)
+	for key, value := range request.Header {
+		header[key] = strings.Join(value, ",")
+	}
+
+	form := make(map[string]string)
+	for key, value := range request.Form {
+		form[key] = strings.Join(value, ",")
+	}
+
+	postForm := make(map[string]string)
+	for key, value := range request.PostForm {
+		postForm[key] = strings.Join(value, ",")
+	}
+
 	req := &redisCache.Request{
-		Method: proto.String(request.Method),
-		URL: URL,
+		Method:   "GET",
+		URL:      url,
+		Header:   header,
+		Host:     request.Host,
+		Form:     form,
+		PostForm: postForm,
 	}
 
 	data, err := proto.Marshal(req)
@@ -38,22 +58,28 @@ func serializeRequest(request *http.Request) []byte {
 }
 
 func BeginRecord(function *metav1.ObjectMeta, request *http.Request) {
-	// reqUID := strings.ToLower(uuid.NewV4().String())
-	reqUID := function.Name + strconv.Itoa(generator)
-	generator++
+	UID := strings.ToLower(uuid.NewV4().String())
+	reqUID := function.Name + UID
 
 	client := NewClient()
 
-	sreq := serializeRequest(request)
+	sReq := serializeRequest(request)
 
-	_, err := client.Do("SET", reqUID, "This is a string")
+	_, err := client.Do("SET", reqUID, sReq)
 	if err != nil {
 		panic(err)
 	}
 
-	val, err := redis.String(client.Do("GET", reqUID))
+	val, err := redis.Bytes(client.Do("GET", reqUID))
 	if err != nil {
 		panic(err)
 	}
-	log.Info("Obtained this key-value pair: ", reqUID, val)
+
+	req := &redisCache.Request{}
+	err = proto.Unmarshal(val, req)
+	if err != nil {
+		log.Fatal("Unmarshalling error: ", err)
+	}
+
+	log.Info(fmt.Sprintf("Obtained this key-value pair: %v : %v", reqUID, req))
 }
