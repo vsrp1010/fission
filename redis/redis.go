@@ -1,7 +1,9 @@
 package redis
 
 import (
+	"time"
 	"net/http"
+
 	"github.com/golang/protobuf/proto"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/gomodule/redigo/redis"
@@ -52,12 +54,26 @@ func serializeRequest(request *http.Request) []byte {
 
 	data, err := proto.Marshal(req)
 	if err != nil {
-		log.Fatal("Marshalling error: ", err)
+		log.Fatal("Marshalling request error: ", err)
 	}
 	return data
 }
 
-func BeginRecord(function *metav1.ObjectMeta, request *http.Request) {
+
+//func serializeResponse(response *http.Response) []byte {
+//	resp := &redisCache.Response{
+//		Status: response.Status,
+//		StatusCode: int32(response.StatusCode),
+//	}
+//	data, err := proto.Marshal(resp)
+//	if err != nil {
+//		log.Fatal("Marshalling response error: ", err)
+//	}
+//	return data
+//}
+
+
+func BeginRecord(function *metav1.ObjectMeta, request *http.Request) string {
 	UID := strings.ToLower(uuid.NewV4().String())
 	reqUID := function.Name + UID
 
@@ -70,6 +86,7 @@ func BeginRecord(function *metav1.ObjectMeta, request *http.Request) {
 		panic(err)
 	}
 
+	// TODO: Following lines are just to check that the request was stored properly. Remove after manual testing is done.
 	val, err := redis.Bytes(client.Do("GET", reqUID))
 	if err != nil {
 		panic(err)
@@ -81,5 +98,70 @@ func BeginRecord(function *metav1.ObjectMeta, request *http.Request) {
 		log.Fatal("Unmarshalling error: ", err)
 	}
 
-	log.Info(fmt.Sprintf("Obtained this key-value pair: %v : %v", reqUID, req))
+	log.Info(fmt.Sprintf("Stored this key-value pair: %v : %v", reqUID, req))
+	return reqUID
+}
+
+/*
+func EndRecord(reqUID string, resp *http.Response) {
+	// Case where the function should not have been recorded
+	if len(reqUID) == 0 {
+		return
+	}
+	// TODO: Reuse the same client
+	respUID := "RESP-" + reqUID
+
+	sResp := serializeResponse(resp)
+
+	client := NewClient()
+	_, err := client.Do("SET", respUID, sResp)
+	if err != nil {
+		panic(err)
+	}
+
+	associateResponse(reqUID, sResp)
+}
+*/
+
+func EndRecord(reqUID string, namespace string, timestamp time.Time, response *http.Response) {
+	// Case where the function should not have been recorded
+	if len(reqUID) == 0 {
+		return
+	}
+
+	client := NewClient()
+
+	val, err := redis.Bytes(client.Do("GET", reqUID))
+	if err != nil {
+		panic(err)
+	}
+
+	req := &redisCache.Request{}
+	err = proto.Unmarshal(val, req)
+	if err != nil {
+		log.Fatal("Unmarshalling error: ", err)
+	}
+
+	resp := &redisCache.Response{
+		Status: response.Status,
+		StatusCode: int32(response.StatusCode),
+	}
+
+	ureq := &redisCache.UniqueRequest {
+		Req: req,
+		Resp: resp,
+		Recorder: "Placeholder recorder",
+		Namespace: namespace,
+		Timestamp: timestamp.String(),
+	}
+
+	data, err := proto.Marshal(ureq)
+	if err != nil {
+		log.Fatal("Marshalling UniqueRequest error: ", err)
+	}
+
+	_, err = client.Do("SET", reqUID, data)
+	if err != nil {
+		panic(err)
+	}
 }

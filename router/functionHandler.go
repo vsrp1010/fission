@@ -48,6 +48,7 @@ type RetryingRoundTripper struct {
 	maxRetries     int
 	initialTimeout time.Duration
 	funcHandler    *functionHandler
+	reqUID         string
 }
 
 // RoundTrip is a custom transport with retries for http requests that forwards the request to the right serviceUrl, obtained
@@ -171,6 +172,8 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 				go roundTripper.funcHandler.tapService(serviceUrl)
 			}
 
+			// TODO: Stop recording -- find the correct placement for this
+			redis.EndRecord(roundTripper.reqUID, roundTripper.funcHandler.function.Namespace, time.Now(), resp)
 			// return response back to user
 			return resp, nil
 		}
@@ -218,9 +221,10 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 	for k, v := range vars {
 		request.Header.Add(fmt.Sprintf("X-Fission-Params-%v", k), v)
 	}
+	var reqUID string
 	if fh.doRecord == true {
 		logrus.Info("Begin recording!")
-		redis.BeginRecord(fh.function, request)
+		reqUID = redis.BeginRecord(fh.function, request)
 	} else {
 		logrus.Info("Don't begin recording.")
 	}
@@ -241,6 +245,7 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 			initialTimeout: 50 * time.Millisecond,
 			maxRetries:     10,
 			funcHandler:    fh,
+			reqUID:         reqUID,
 		},
 	}
 
