@@ -19,7 +19,5 @@ message Response {
 message UniqueRequest {
     Request Req = 9;
     Response Resp = 10;
-    string Recorder = 11;
-    string Namespace = 12;
-    string Timestamp = 13;
+    int64 Timestamp = 11;
 }

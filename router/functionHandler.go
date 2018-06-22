@@ -33,6 +33,8 @@ import (
 	executorClient "github.com/fission/fission/executor/client"
 	logrus "github.com/sirupsen/logrus"
 	"github.com/fission/fission/redis"
+	"strings"
+	"github.com/satori/go.uuid"
 )
 
 type functionHandler struct {
@@ -173,7 +175,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 			}
 
 			// TODO: Stop recording -- find the correct placement for this
-			redis.EndRecord(roundTripper.reqUID, roundTripper.funcHandler.function.Namespace, time.Now(), resp)
+			redis.EndRecord(roundTripper.reqUID, req, resp, roundTripper.funcHandler.function.Namespace, time.Now().UnixNano())
 			// return response back to user
 			return resp, nil
 		}
@@ -224,7 +226,9 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 	var reqUID string
 	if fh.doRecord == true {
 		logrus.Info("Begin recording!")
-		reqUID = redis.BeginRecord(fh.function, request)
+		UID := strings.ToLower(uuid.NewV4().String())
+		reqUID = fh.function.Name + UID
+		// reqUID = redis.BeginRecord(fh.function, request)
 	} else {
 		logrus.Info("Don't begin recording.")
 	}

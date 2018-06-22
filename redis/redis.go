@@ -1,17 +1,13 @@
 package redis
 
 import (
-	"time"
 	"net/http"
 
 	"github.com/golang/protobuf/proto"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/gomodule/redigo/redis"
 	log "github.com/sirupsen/logrus"
 	"github.com/fission/fission/redis/build/gen"
 	"strings"
-	"github.com/satori/go.uuid"
-	"fmt"
 )
 
 func NewClient() redis.Conn {
@@ -72,7 +68,7 @@ func serializeRequest(request *http.Request) []byte {
 //	return data
 //}
 
-
+/*
 func BeginRecord(function *metav1.ObjectMeta, request *http.Request) string {
 	UID := strings.ToLower(uuid.NewV4().String())
 	reqUID := function.Name + UID
@@ -101,28 +97,9 @@ func BeginRecord(function *metav1.ObjectMeta, request *http.Request) string {
 	log.Info(fmt.Sprintf("Stored this key-value pair: %v : %v", reqUID, req))
 	return reqUID
 }
-
-/*
-func EndRecord(reqUID string, resp *http.Response) {
-	// Case where the function should not have been recorded
-	if len(reqUID) == 0 {
-		return
-	}
-	// TODO: Reuse the same client
-	respUID := "RESP-" + reqUID
-
-	sResp := serializeResponse(resp)
-
-	client := NewClient()
-	_, err := client.Do("SET", respUID, sResp)
-	if err != nil {
-		panic(err)
-	}
-
-	associateResponse(reqUID, sResp)
-}
 */
 
+/*
 func EndRecord(reqUID string, namespace string, timestamp time.Time, response *http.Response) {
 	// Case where the function should not have been recorded
 	if len(reqUID) == 0 {
@@ -153,6 +130,65 @@ func EndRecord(reqUID string, namespace string, timestamp time.Time, response *h
 		Recorder: "Placeholder recorder",
 		Namespace: namespace,
 		Timestamp: timestamp.String(),
+	}
+
+	data, err := proto.Marshal(ureq)
+	if err != nil {
+		log.Fatal("Marshalling UniqueRequest error: ", err)
+	}
+
+	_, err = client.Do("SET", reqUID, data)
+	if err != nil {
+		panic(err)
+	}
+}
+*/
+
+func EndRecord(reqUID string, request *http.Request, response *http.Response, namespace string, timestamp int64) {
+	// Case where the function should not have been recorded
+	if len(reqUID) == 0 {
+		return
+	}
+
+	client := NewClient()
+
+	url := make(map[string]string)
+	url["Host"] = request.URL.Host
+	url["Path"] = request.URL.Path
+
+	header := make(map[string]string)
+	for key, value := range request.Header {
+		header[key] = strings.Join(value, ",")
+	}
+
+	form := make(map[string]string)
+	for key, value := range request.Form {
+		form[key] = strings.Join(value, ",")
+	}
+
+	postForm := make(map[string]string)
+	for key, value := range request.PostForm {
+		postForm[key] = strings.Join(value, ",")
+	}
+
+	req := &redisCache.Request{
+		Method:   "GET",
+		URL:      url,
+		Header:   header,
+		Host:     request.Host,
+		Form:     form,
+		PostForm: postForm,
+	}
+
+	resp := &redisCache.Response{
+		Status: response.Status,
+		StatusCode: int32(response.StatusCode),
+	}
+
+	ureq := &redisCache.UniqueRequest {
+		Req: req,
+		Resp: resp,
+		Timestamp: timestamp,
 	}
 
 	data, err := proto.Marshal(ureq)
