@@ -126,9 +126,9 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 		}
 
 		// Check if this trigger should be recorded
-		var doRecord bool
+		var recorder string
  		if ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name] != nil {
-			doRecord = true
+			recorder = ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name].Spec.Name
 		}
 
 		//log.Printf("The trigger %v should be recorded: %v", trigger.Metadata.Name, doRecord)
@@ -143,7 +143,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			function:    rr.functionMetadata,
 			executor:    ts.executor,
 			httpTrigger: &trigger,
-			doRecord:    doRecord,
+			recorderName:    recorder,
 		}
 
 		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)
@@ -171,16 +171,16 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	for _, function := range ts.functions {
 		m := function.Metadata
 
-		var doRecord bool
+		var recorder string
 		if ts.recorderSet.functionRecorderMap[m.Name] != nil {
-			doRecord = true
+			recorder = ts.recorderSet.functionRecorderMap[m.Name].Spec.Name
 		}
 
 		fh := &functionHandler{
 			fmap:     ts.functionServiceMap,
 			function: &m,
 			executor: ts.executor,
-			doRecord: doRecord,
+			recorderName: recorder,
 		}
 		muxRouter.HandleFunc(fission.UrlForFunction(function.Metadata.Name, function.Metadata.Namespace), fh.handler)
 	}

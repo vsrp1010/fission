@@ -42,7 +42,7 @@ type functionHandler struct {
 	executor    *executorClient.Client
 	function    *metav1.ObjectMeta
 	httpTrigger *crd.HTTPTrigger
-	doRecord    bool
+	recorderName    string
 }
 
 // A layer on top of http.DefaultTransport, with retries.
@@ -224,10 +224,11 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 		request.Header.Add(fmt.Sprintf("X-Fission-Params-%v", k), v)
 	}
 	var reqUID string
-	if fh.doRecord == true {
+	if fh.recorderName != "" {
 		logrus.Info("Begin recording!")
 		UID := strings.ToLower(uuid.NewV4().String())
 		reqUID = fh.function.Name + UID
+		request.Header.Add("X-Fission-Recorder", reqUID)
 		// reqUID = redis.BeginRecord(fh.function, request)
 	} else {
 		logrus.Info("Don't begin recording.")

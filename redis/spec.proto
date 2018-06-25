@@ -16,8 +16,11 @@ message Response {
     int32 StatusCode = 8;
 }
 
+/*
+    Used to include `int64 Timestamp = 11;`
+*/
+
 message UniqueRequest {
     Request Req = 9;
     Response Resp = 10;
-    int64 Timestamp = 11;
 }
