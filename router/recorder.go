@@ -146,10 +146,10 @@ func (rs *RecorderSet) updateRecorder(old *crd.Recorder, new *crd.Recorder) {
 	}
 }
 
-func (rs *RecorderSet) triggerDeleted(trigger *crd.HTTPTrigger) {
+func (rs *RecorderSet) deleteTrigger(trigger *crd.HTTPTrigger) {
 	delete(rs.triggerRecorderMap, trigger.Metadata.Name)
 }
 
-func (rs *RecorderSet) funcDeleted(function *crd.Function) {
+func (rs *RecorderSet) deleteFunction(function *crd.Function) {
 	delete(rs.functionRecorderMap, function.Metadata.Name)
 }

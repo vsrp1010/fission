@@ -174,8 +174,23 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 				go roundTripper.funcHandler.tapService(serviceUrl)
 			}
 
+			if roundTripper.funcHandler.httpTrigger != nil {
+				if len(roundTripper.funcHandler.httpTrigger.Spec.RelativeURL) == 0 {
+					log.Print("Couldn't find the trigger!")
+				} else {
+					log.Print("Found it: ", roundTripper.funcHandler.httpTrigger.Spec.RelativeURL)
+				}
+			} else {
+				log.Println("It is nil, what can you do?")
+			}
+
 			// TODO: Stop recording -- find the correct placement for this
-			redis.EndRecord(roundTripper.reqUID, req, resp, roundTripper.funcHandler.function.Namespace, time.Now().UnixNano())
+			redis.EndRecord(
+				"trigonometry",
+				roundTripper.funcHandler.recorderName,
+				roundTripper.reqUID, req, resp, roundTripper.funcHandler.function.Namespace,
+				time.Now().UnixNano(),
+				)
 			// return response back to user
 			return resp, nil
 		}
@@ -224,10 +239,14 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 		request.Header.Add(fmt.Sprintf("X-Fission-Params-%v", k), v)
 	}
 	var reqUID string
+	if fh.httpTrigger != nil {
+		log.Print("Not nil here")
+		log.Print(fh.httpTrigger.Spec.RelativeURL)
+	}
 	if fh.recorderName != "" {
 		logrus.Info("Begin recording!")
 		UID := strings.ToLower(uuid.NewV4().String())
-		reqUID = fh.function.Name + UID
+		reqUID = "REQ" + UID
 		request.Header.Add("X-Fission-Recorder", reqUID)
 		// reqUID = redis.BeginRecord(fh.function, request)
 	} else {

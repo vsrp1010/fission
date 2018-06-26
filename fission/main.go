@@ -205,6 +205,11 @@ func main() {
 		{Name: "list", Usage: "List recorders", Flags: []cli.Flag{}, Action: recorderList},
 	}
 
+	filterTime := cli.StringFlag{Name: "time", Usage: "Filter records by time"}
+	recViewSubcommands := []cli.Command{
+		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTime}, Action: recordsView},
+	}
+
 	// environments
 	envNameFlag := cli.StringFlag{Name: "name", Usage: "Environment name"}
 	envPoolsizeFlag := cli.IntFlag{Name: "poolsize", Value: 3, Usage: "Size of the pool"}
@@ -282,6 +287,7 @@ func main() {
 		{Name: "timetrigger", Aliases: []string{"tt", "timer"}, Usage: "Manage Time triggers (timers) for functions", Subcommands: ttSubcommands},
 		{Name: "mqtrigger", Aliases: []string{"mqt", "messagequeue"}, Usage: "Manage message queue triggers for functions", Subcommands: mqtSubcommands},
 		{Name: "recorder", Usage: "Manage recorders for functions", Subcommands: recSubcommands},
+		{Name: "records", Usage: "View existing records", Subcommands: recViewSubcommands},
 		{Name: "environment", Aliases: []string{"env"}, Usage: "Manage environments", Subcommands: envSubcommands},
 		{Name: "watch", Aliases: []string{"w"}, Usage: "Manage watches", Subcommands: wSubCommands},
 		{Name: "package", Aliases: []string{"pkg"}, Usage: "Manage packages", Subcommands: pkgSubCommands},

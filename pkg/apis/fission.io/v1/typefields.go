@@ -315,7 +315,7 @@ type (
 	// TODO: Where should Redis/MongoDB be configured? Create helm config file.
 	RecorderSpec struct {
 		Name              string
-		Functions         []FunctionReference
+		Function         FunctionReference		// TODO: Keep this type?
 		Triggers          []TriggerReference	// TODO: Need to know type (HTTP, MQ, Time)
 		RetentionPolicy   string				// Max memory AND/OR time
 		EvictionPolicy    string                // TODO: Remove from all places

@@ -21,7 +21,7 @@ func NewClient() redis.Conn {
 	return c
 }
 
-func EndRecord(reqUID string, request *http.Request, response *http.Response, namespace string, timestamp int64) {
+func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, response *http.Response, namespace string, timestamp int64) {
 	// Case where the function should not have been recorded
 	if len(reqUID) == 0 {
 		return
@@ -65,6 +65,7 @@ func EndRecord(reqUID string, request *http.Request, response *http.Response, na
 	ureq := &redisCache.UniqueRequest {
 		Req: req,
 		Resp: resp,
+		Trigger: triggerName,
 	}
 
 	data, err := proto.Marshal(ureq)
@@ -72,16 +73,22 @@ func EndRecord(reqUID string, request *http.Request, response *http.Response, na
 		log.Fatal("Marshalling UniqueRequest error: ", err)
 	}
 
-	_, err = client.Do("HMSET", reqUID, "ReqResponse", data, "Timestamp", timestamp)
+	_, err = client.Do("HMSET", reqUID, "ReqResponse", data, "Timestamp", timestamp, "Trigger", triggerName)
 	if err != nil {
 		panic(err)
 	}
 
-	FilterByTime(reqUID, 100.00)
+	//_, err = client.Do("LPUSH", recorderName, reqUID)
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	// FilterByTime(100.00)
 }
 
 // Currently only prints the records from the past n seconds
-func FilterByTime(reqUID string, pastN float64) {
+// TODO: Units of start and end time specified by user?
+func FilterByTime(pastN float64) error {
 	// Needs to scan all records, converting each record's nanosecond int64 timestamp to time.Time type
 	// and subtract that time from time.Now() to see if it's within pastN seconds. If so, print that record.
 
@@ -92,7 +99,8 @@ func FilterByTime(reqUID string, pastN float64) {
 	for {
 		arr, err := redis.Values(client.Do("SCAN", iter))
 		if err != nil {
-			log.Fatal(err)
+			//log.Fatal(err)
+			return err
 		}
 		iter, _ = redis.Int(arr[0], nil)
 		k, _ := redis.Strings(arr[1], nil)
@@ -109,9 +117,10 @@ func FilterByTime(reqUID string, pastN float64) {
 	for _, key := range keys {
 		val, err := redis.Strings(client.Do("HMGET", key, "Timestamp"))
 		if err != nil {
-			log.Fatal(err)
+			// log.Fatal(err)
+			return err
 		}
-		ts, _ := strconv.Atoi(val[0]) // TODO: Get int64 originally
+		ts, _ := strconv.Atoi(val[0]) 				// TODO: Get int64 precision from here
 		uts := time.Unix(0, int64(ts))
 		difference := now.Sub(uts).Seconds()
 		fmt.Println(fmt.Sprintf("Recorded %v %v seconds ago: ", key, difference))
@@ -120,5 +129,6 @@ func FilterByTime(reqUID string, pastN float64) {
 		}
 	}
 
-	fmt.Println(filtered)
+	log.Info("Filtered reqUIDs: ", filtered)
+	return nil
 }

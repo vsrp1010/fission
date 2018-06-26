@@ -143,7 +143,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			function:    rr.functionMetadata,
 			executor:    ts.executor,
 			httpTrigger: &trigger,
-			recorderName:    recorder,
+			recorderName: recorder,
 		}
 
 		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)
@@ -179,7 +179,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 		fh := &functionHandler{
 			fmap:     ts.functionServiceMap,
 			function: &m,
-			executor: ts.executor,
+			executor: ts.executor,				// TODO: Need some kind of trigger reference for recording
 			recorderName: recorder,
 		}
 		muxRouter.HandleFunc(fission.UrlForFunction(function.Metadata.Name, function.Metadata.Namespace), fh.handler)
@@ -218,7 +218,7 @@ func (ts *HTTPTriggerSet)  initTriggerController() (k8sCache.Store, k8sCache.Con
 				ts.syncTriggers()
 				trigger := obj.(*crd.HTTPTrigger)
 				go deleteIngress(trigger, ts.kubeClient)
-				go ts.recorderSet.triggerDeleted(trigger)
+				go ts.recorderSet.deleteTrigger(trigger)
 			},
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				oldTrigger := oldObj.(*crd.HTTPTrigger)
@@ -241,7 +241,7 @@ func (ts *HTTPTriggerSet) initFunctionController() (k8sCache.Store, k8sCache.Con
 			DeleteFunc: func(obj interface{}) {
 				function := obj.(*crd.Function)
 				ts.syncTriggers()
-				go ts.recorderSet.funcDeleted(function)
+				go ts.recorderSet.deleteFunction(function)
 			},
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				fn := newObj.(*crd.Function)
