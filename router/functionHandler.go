@@ -95,6 +95,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	timeout := roundTripper.initialTimeout
 	transport := http.DefaultTransport.(*http.Transport)
 	//transport.IdleConnTimeout = 3 * time.Second
+	defer transport.CloseIdleConnections()
 
 	// cache lookup to get serviceUrl
 	serviceUrl, err = roundTripper.funcHandler.fmap.lookup(roundTripper.funcHandler.function)
