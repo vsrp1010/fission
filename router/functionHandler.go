@@ -94,7 +94,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	// set the timeout for transport context
 	timeout := roundTripper.initialTimeout
 	transport := http.DefaultTransport.(*http.Transport)
-	transport.IdleConnTimeout = 3 * time.Second
+	//transport.IdleConnTimeout = 3 * time.Second
 
 	// cache lookup to get serviceUrl
 	serviceUrl, err = roundTripper.funcHandler.fmap.lookup(roundTripper.funcHandler.function)
@@ -102,6 +102,12 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 		// cache miss or nil entry in cache
 		needExecutor = true
 	}
+
+	// over-riding default settings.
+	transport.DialContext = (&net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
 
 	for i := 0; i < roundTripper.maxRetries-1; i++ {
 		if needExecutor {
@@ -145,12 +151,6 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 		// or request will be blocked in some situations
 		// (e.g. istio-proxy)
 		req.Host = serviceUrl.Host
-
-		// over-riding default settings.
-		transport.DialContext = (&net.Dialer{
-			Timeout:   timeout,
-			KeepAlive: 30 * time.Second,
-		}).DialContext
 
 		overhead := time.Since(startTime)
 
