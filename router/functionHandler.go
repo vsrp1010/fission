@@ -95,7 +95,8 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	timeout := roundTripper.initialTimeout
 	transport := http.DefaultTransport.(*http.Transport)
 	// Disables caching, Please refer to issue and specifically comment: https://github.com/fission/fission/issues/723#issuecomment-398781995
-	transport.DisableKeepAlives = true
+	//transport.DisableKeepAlives = true
+	transport.IdleConnTimeout = 5 * time.Second
 
 	// cache lookup to get serviceUrl
 	serviceUrl, err = roundTripper.funcHandler.fmap.lookup(roundTripper.funcHandler.function)
