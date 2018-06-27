@@ -38,6 +38,7 @@ type functionHandler struct {
 	executor    *executorClient.Client
 	function    *metav1.ObjectMeta
 	httpTrigger *crd.HTTPTrigger
+	transport   *http.Transport
 }
 
 // A layer on top of http.DefaultTransport, with retries.
@@ -93,9 +94,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 
 	// set the timeout for transport context
 	timeout := roundTripper.initialTimeout
-	transport := http.DefaultTransport.(*http.Transport)
-	//transport.IdleConnTimeout = 3 * time.Second
-	defer transport.CloseIdleConnections()
+	transport := roundTripper.funcHandler.transport
 
 	// cache lookup to get serviceUrl
 	serviceUrl, err = roundTripper.funcHandler.fmap.lookup(roundTripper.funcHandler.function)

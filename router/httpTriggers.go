@@ -19,6 +19,7 @@ package router
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -99,6 +100,18 @@ func routerHealthHandler(w http.ResponseWriter, r *http.Request) {
 func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	muxRouter := mux.NewRouter()
 
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
 	// HTTP triggers setup by the user
 	homeHandled := false
 	for i := range ts.triggers {
@@ -125,6 +138,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			function:    rr.functionMetadata,
 			executor:    ts.executor,
 			httpTrigger: &trigger,
+			transport:   transport,
 		}
 
 		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)
