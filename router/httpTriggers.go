@@ -18,6 +18,7 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -35,22 +36,34 @@ import (
 	executorClient "github.com/fission/fission/executor/client"
 )
 
-type HTTPTriggerSet struct {
-	*functionServiceMap
-	*mutableRouter
+var (
+//funcTransportInfoMap map[string]*http.Transport
+)
 
-	fissionClient     *crd.FissionClient
-	kubeClient        *kubernetes.Clientset
-	executor          *executorClient.Client
-	resolver          *functionReferenceResolver
-	crdClient         *rest.RESTClient
-	triggers          []crd.HTTPTrigger
-	triggerStore      k8sCache.Store
-	triggerController k8sCache.Controller
-	functions         []crd.Function
-	funcStore         k8sCache.Store
-	funcController    k8sCache.Controller
-}
+type (
+	HTTPTriggerSet struct {
+		*functionServiceMap
+		*mutableRouter
+
+		fissionClient     *crd.FissionClient
+		kubeClient        *kubernetes.Clientset
+		executor          *executorClient.Client
+		resolver          *functionReferenceResolver
+		crdClient         *rest.RESTClient
+		triggers          []crd.HTTPTrigger
+		triggerStore      k8sCache.Store
+		triggerController k8sCache.Controller
+		functions         []crd.Function
+		funcStore         k8sCache.Store
+		funcController    k8sCache.Controller
+		funcTransportMap  map[string]*http.Transport
+	}
+
+	//funcTransportInfo struct {
+	//	resourceVersion string
+	//	transport
+	//}
+)
 
 func makeHTTPTriggerSet(fmap *functionServiceMap, fissionClient *crd.FissionClient,
 	kubeClient *kubernetes.Clientset, executor *executorClient.Client, crdClient *rest.RESTClient) (*HTTPTriggerSet, k8sCache.Store, k8sCache.Store) {
@@ -61,6 +74,7 @@ func makeHTTPTriggerSet(fmap *functionServiceMap, fissionClient *crd.FissionClie
 		kubeClient:         kubeClient,
 		executor:           executor,
 		crdClient:          crdClient,
+		funcTransportMap:   make(map[string]*http.Transport),
 	}
 	var tStore, fnStore k8sCache.Store
 	var tController, fnController k8sCache.Controller
@@ -100,23 +114,10 @@ func routerHealthHandler(w http.ResponseWriter, r *http.Request) {
 func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	muxRouter := mux.NewRouter()
 
-	transport := &http.Transport{
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-	}
-
 	// HTTP triggers setup by the user
 	homeHandled := false
 	for i := range ts.triggers {
 		trigger := ts.triggers[i]
-
 		// resolve function reference
 		rr, err := ts.resolver.resolve(trigger.Metadata.Namespace, &trigger.Spec.FunctionReference)
 		if err != nil {
@@ -133,12 +134,14 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			log.Panicf("resolve result type not implemented (%v)", rr.resolveResultType)
 		}
 
+		key := getFuncTransportCachekey(trigger.Metadata)
+
 		fh := &functionHandler{
 			fmap:        ts.functionServiceMap,
 			function:    rr.functionMetadata,
 			executor:    ts.executor,
 			httpTrigger: &trigger,
-			transport:   transport,
+			transport:   ts.funcTransportMap[key],
 		}
 
 		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)
@@ -201,7 +204,22 @@ func (ts *HTTPTriggerSet) initTriggerController() (k8sCache.Store, k8sCache.Cont
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				oldTrigger := oldObj.(*crd.HTTPTrigger)
 				newTrigger := newObj.(*crd.HTTPTrigger)
+
+				if oldTrigger.Metadata.ResourceVersion == newTrigger.Metadata.ResourceVersion {
+					return
+				}
+
+				key := getFuncTransportCachekey(newTrigger.Metadata)
+				if transport, ok := ts.funcTransportMap[key]; ok {
+					// close old transport idle connections
+					defer transport.CloseIdleConnections()
+				}
+
+				// create new transport to serve new coming requests
+				ts.funcTransportMap[key] = makeTransport()
+
 				go updateIngress(oldTrigger, newTrigger, ts.kubeClient)
+
 				ts.syncTriggers()
 			},
 		})
@@ -263,4 +281,22 @@ func (ts *HTTPTriggerSet) syncTriggers() {
 
 	// make a new router and use it
 	ts.mutableRouter.updateRouter(ts.getRouter())
+}
+
+func getFuncTransportCachekey(metadata metav1.ObjectMeta) string {
+	return fmt.Sprintf("%v-%v-%v", metadata.Name, metadata.Namespace)
+}
+
+func makeTransport() *http.Transport {
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
 }
