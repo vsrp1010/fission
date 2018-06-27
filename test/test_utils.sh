@@ -454,7 +454,7 @@ run_all_tests() {
     export FISSION_NAMESPACE=f-$id
     export FUNCTION_NAMESPACE=f-func-$id
 
-    test_files=$(find $ROOT/test/tests -iname 'test_*.sh')
+    test_files=$(find $ROOT/test/tests -iname 'test_nd_pkg_update.sh')
 
     for file in $test_files
     do
