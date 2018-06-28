@@ -78,12 +78,11 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 		panic(err)
 	}
 
-	//_, err = client.Do("LPUSH", recorderName, reqUID)
-	//if err != nil {
-	//	panic(err)
-	//}
+	_, err = client.Do("LPUSH", recorderName, reqUID)
+	if err != nil {
+		panic(err)
+	}
 
-	// FilterByTime(100.00)
 }
 
 // Currently only prints the records from the past n seconds

@@ -64,7 +64,7 @@ func (rs *RecorderSet) initRecorderController() (k8sCache.Store, k8sCache.Contro
 
 // All new recorders are by default enabled
 func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
-	functions := r.Spec.Functions
+	function := r.Spec.Function
 	triggers := r.Spec.Triggers
 
 	// If triggers are not explicitly specified during the creation of this recorder,
@@ -74,6 +74,7 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 
 	//log.Info("New recorder ! Need track? ", needTrack)
 
+	/*
 	if len(functions) != 0 {
 		for _, function := range functions {
 			rs.functionRecorderMap[function.Name] = r
@@ -82,6 +83,11 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 				trackFunction[function] = true
 			}
 		}
+	}
+	*/
+	rs.functionRecorderMap[function.Name] = r
+	if needTrack {
+		trackFunction[function] = true
 	}
 
 	// Account for implicitly added triggers
@@ -113,17 +119,17 @@ func keys(m map[string]*crd.Recorder) (keys []string) {
 
 // TODO: Delete or disable?
 func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
-	functions := r.Spec.Functions
+	function := r.Spec.Function
 	triggers := r.Spec.Triggers
 
 	//log.Info("Disabling recorder !")
 
-	if len(functions) != 0 {
-		for _, function := range functions {
+	//if len(functions) != 0 {
+	//	for _, function := range functions {
 			delete(rs.functionRecorderMap, function.Name)		// Alternatively set the value to false
 			//rs.functionRecorderMap[function.Name] = nil
-		}
-	}
+	//	}
+	//}
 
 	if len(triggers) != 0 {
 		for _, trigger := range triggers {

@@ -191,7 +191,7 @@ func main() {
 
 	// TODO: Namespace flag?
 	recNameFlag := cli.StringFlag{Name: "name", Usage: "Recorder name"}
-	recFnsFlag := cli.StringSliceFlag{Name: "function", Usage: "Record Function name(s)"}
+	recFnsFlag := cli.StringFlag{Name: "function", Usage: "Record Function name(s)"}
 	recTriggersFlag := cli.StringSliceFlag{Name: "trigger", Usage: "Record Trigger name(s)"}
 	recRetentionPolFlag := cli.StringFlag{Name: "retention", Usage: "Retention policy (number of days)"}
 	recEvictionPolFlag := cli.StringFlag{Name: "eviction", Usage: "Eviction policy (default LRU)"}
@@ -205,9 +205,10 @@ func main() {
 		{Name: "list", Usage: "List recorders", Flags: []cli.Flag{}, Action: recorderList},
 	}
 
-	filterTime := cli.StringFlag{Name: "time", Usage: "Filter records by time"}
+	filterTime := cli.StringFlag{Name: "from", Usage: "Filter records by time"}
+	filterFunction := cli.StringFlag{Name: "function", Usage: "Filter records by function"}
 	recViewSubcommands := []cli.Command{
-		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTime}, Action: recordsView},
+		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTime, filterFunction}, Action: recordsView},
 	}
 
 	// environments

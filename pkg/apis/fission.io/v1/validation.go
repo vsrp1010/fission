@@ -465,9 +465,8 @@ func (spec RecorderSpec) Validate() error {
 		result = multierror.Append(result, MakeValidationErr(ErrorUnsupportedType, "RecorderSpec.BackendType", spec.BackendType, "not a supported backend type"))
 	}
 	*/
-	for _, functionRef := range spec.Functions {
-		result = multierror.Append(result, functionRef.Validate())
-	}
+	result = multierror.Append(result, spec.Function.Validate())
+
 	for _, triggerRef := range spec.Triggers {
 		result = multierror.Append(result, triggerRef.Validate())
 	}

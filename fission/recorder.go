@@ -39,24 +39,19 @@ func recorderCreate(c *cli.Context) error {
 	if len(recName) == 0 {
 		recName = uuid.NewV4().String()
 	}
-	fnsOriginal := c.StringSlice("function")
+	fnName := c.String("function")
 	triggersOriginal := c.StringSlice("trigger")
 
-	if len(fnsOriginal) == 0 && len(triggersOriginal) == 0 {
-		fatal("Need to specify at least one function or one trigger, use --function, --trigger")
-	}
+	// TODO: XOR
+	//if len(fnsOriginal) == 0 && len(triggersOriginal) == 0 {
+	//	fatal("Need to specify at least one function or one trigger, use --function, --trigger")
+	//}
 
-	var functions []v1.FunctionReference
-	if len(fnsOriginal) != 0 {
-		fns := strings.Split(fnsOriginal[0], ",")
-		for _, name := range fns {
-			functions = append(functions, v1.FunctionReference{
-				//Type: FunctionReferenceTypeFunctionName,
+	var function v1.FunctionReference
+	function = v1.FunctionReference{
 				Type: "name",
-				Name: name,
-			})
-		}
-	}
+				Name: fnName,
+			}
 
 	var triggers []v1.TriggerReference
 	if len(triggersOriginal) != 0 {
@@ -79,7 +74,7 @@ func recorderCreate(c *cli.Context) error {
 		},
 		Spec: fission.RecorderSpec{
 			Name:            recName,
-			Functions:       functions, 	// TODO
+			Function:        function, 	// TODO
 			Triggers:        triggers,		// TODO
 			RetentionPolicy: retPolicy,
 			EvictionPolicy:  evictPolicy,
@@ -118,9 +113,9 @@ func recorderGet(c *cli.Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-		"NAME", "ENABLED", "FUNCTIONS", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
+		"NAME", "ENABLED", "FUNCTION", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
 	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
-			recorder.Metadata.Name, recorder.Spec.Enabled, recorder.Spec.Functions, recorder.Spec.Triggers, recorder.Spec.RetentionPolicy, recorder.Spec.EvictionPolicy,)
+			recorder.Metadata.Name, recorder.Spec.Enabled, recorder.Spec.Function, recorder.Spec.Triggers, recorder.Spec.RetentionPolicy, recorder.Spec.EvictionPolicy,)
 	w.Flush()
 
 	return nil
@@ -200,7 +195,7 @@ func recorderList(c *cli.Context) error {
 	client := getClient(c.GlobalString("server"))
 	// TODO: Namespace
 
-	recorders, err := client.RecorderList("redis", "default")
+	recorders, err := client.RecorderList("default")
 
 	checkErr(err, "list recorders")
 
@@ -210,7 +205,7 @@ func recorderList(c *cli.Context) error {
 		"NAME", "ENABLED", "FUNCTIONS", "TRIGGERS", "RETENTION_POLICY", "EVICTION_POLICY")
 	for _, r := range recorders {
 		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
-			r.Metadata.Name, r.Spec.Enabled, r.Spec.Functions, r.Spec.Triggers, r.Spec.RetentionPolicy, r.Spec.EvictionPolicy,)
+			r.Metadata.Name, r.Spec.Enabled, r.Spec.Function, r.Spec.Triggers, r.Spec.RetentionPolicy, r.Spec.EvictionPolicy,)
 	}
 	w.Flush()
 
