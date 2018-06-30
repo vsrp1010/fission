@@ -39,7 +39,7 @@ func (rc *RecordsClient) FilterByFunction(query string) error {
 	}
 	var matchingRecorders []string
 	for _, recorder := range recorders {
-		if recorder.Spec.Function.Name == query {
+		if recorder.Spec.Function == query {
 			matchingRecorders = append(matchingRecorders, recorder.Spec.Name)
 		}
 	}

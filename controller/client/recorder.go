@@ -29,11 +29,11 @@ import (
 )
 
 func (c *Client) RecorderCreate(r *crd.Recorder) (*metav1.ObjectMeta, error) {
-	err := r.Validate()
+	//err := r.Validate()
 	// log.Info("This is the validation err: %v", err)
-	if err != nil {
-		return nil, fv1.AggregateValidationErrors("Recorder", err)
-	}
+	//if err != nil {
+	//	return nil, fv1.AggregateValidationErrors("Recorder", err)
+	//}
 
 	reqbody, err := json.Marshal(r)
 	if err != nil {
@@ -177,9 +177,60 @@ func (c *Client) RecordsByFunction(function string) ([]string, error) {
 	return records, nil
 }
 
-func (c *Client) RecordsByTime(from string) ([]string, error) {
-	relativeUrl := "records/time/"
-	relativeUrl += fmt.Sprintf(from)
+func (c *Client) RecordsAll() ([]string, error) {
+	relativeUrl := "records"
+
+	resp, err := http.Get(c.url(relativeUrl))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := c.handleResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	records := make([]string, 0)
+	err = json.Unmarshal(body, &records)
+	if err != nil {
+		return nil, err
+	}
+
+	return records, nil
+}
+
+func (c *Client) RecordsByTrigger(trigger string) ([]string, error) {
+	relativeUrl := "records/trigger/"
+	relativeUrl += fmt.Sprintf(trigger)
+	//relativeUrl += fmt.Sprintf("?trigger=%v", trigger)
+
+	resp, err := http.Get(c.url(relativeUrl))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := c.handleResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	records := make([]string, 0)
+	err = json.Unmarshal(body, &records)
+	if err != nil {
+		return nil, err
+	}
+
+	return records, nil
+}
+
+func (c *Client) RecordsByTime(from string, to string) ([]string, error) {
+	//relativeUrl := "records/time/"
+	//relativeUrl += fmt.Sprintf(from)
+	//relativeUrl += fmt.Sprintf("?to=%v", to)
+	relativeUrl := "records/time"
+	relativeUrl += fmt.Sprintf("?from=%v&to=%v", from, to)
 
 	resp, err := http.Get(c.url(relativeUrl))
 	if err != nil {

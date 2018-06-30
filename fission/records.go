@@ -1,23 +1,66 @@
 package main
 
 import (
-	"errors"
 	"github.com/urfave/cli"
 	"fmt"
+	"text/tabwriter"
+	"os"
 )
 
 func recordsView(c *cli.Context) error {
 	function := c.String("function")
+	trigger := c.String("trigger")
 	from := c.String("from")
+	to := c.String("to")
 
 	// TODO: Support or refuse multiple filters
 	if len(function) != 0 {
 		return recordsByFunction(function, c)
 	}
-	if len(from) != 0 {
-		return recordsByTime(from, c)
+	if len(trigger) != 0 {
+		return recordsByTrigger(trigger, c)
 	}
-	checkErr(errors.New("fallback"), "view records")			// TODO: View all records by default or last 10?
+	if len(from) != 0 {
+		return recordsByTime(from, to, c)
+	}
+	err := recordsAll(c)
+	checkErr(err, "view records")			// TODO: View all records by default or last 10?
+	return nil
+}
+
+func recordsAll(c *cli.Context) error {
+	fc := getClient(c.GlobalString("server"))
+
+	records, err := fc.RecordsAll()
+	checkErr(err, "view records")
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	fmt.Fprintf(w, "%v\n",
+		"REQUID")
+	for _, record := range records {
+		fmt.Fprintf(w, "%v\n", record)
+	}
+	w.Flush()
+
+	return nil
+}
+
+func recordsByTrigger(trigger string, c *cli.Context) error {
+	fc := getClient(c.GlobalString("server"))
+
+	records, err := fc.RecordsByTrigger(trigger)
+	checkErr(err, "view records")
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	fmt.Fprintf(w, "%v\n",
+		"REQUID")
+	for _, record := range records {
+		fmt.Fprintf(w, "%v\n", record)
+	}
+	w.Flush()
+
 	return nil
 }
 
@@ -33,18 +76,32 @@ func recordsByFunction(function string, c *cli.Context) error {
 	records, err := fc.RecordsByFunction(function)
 	checkErr(err, "view records")
 
-	fmt.Println(records)
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	fmt.Fprintf(w, "%v\n",
+		"REQUID")
+	for _, record := range records {
+		fmt.Fprintf(w, "%v\n", record)
+	}
+	w.Flush()
 
 	return nil
 }
 
-func recordsByTime(from string, c *cli.Context) error {
+func recordsByTime(from string, to string, c *cli.Context) error {
 	fc := getClient(c.GlobalString("server"))
 
-	records, err := fc.RecordsByTime(from)
+	records, err := fc.RecordsByTime(from, to)
 	checkErr(err, "view records")
 
-	fmt.Println(records)
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	fmt.Fprintf(w, "%v\n",
+		"REQUID")
+	for _, record := range records {
+		fmt.Fprintf(w, "%v\n", record)
+	}
+	w.Flush()
 
 	return nil
 }

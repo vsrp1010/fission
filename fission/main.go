@@ -191,24 +191,26 @@ func main() {
 
 	// TODO: Namespace flag?
 	recNameFlag := cli.StringFlag{Name: "name", Usage: "Recorder name"}
-	recFnsFlag := cli.StringFlag{Name: "function", Usage: "Record Function name(s)"}
+	recFnFlag := cli.StringFlag{Name: "function", Usage: "Record Function name(s)"}
 	recTriggersFlag := cli.StringSliceFlag{Name: "trigger", Usage: "Record Trigger name(s)"}
 	recRetentionPolFlag := cli.StringFlag{Name: "retention", Usage: "Retention policy (number of days)"}
 	recEvictionPolFlag := cli.StringFlag{Name: "eviction", Usage: "Eviction policy (default LRU)"}
 	recEnabled := cli.BoolFlag{Name: "enable", Usage: "Recorder enable"}
 	recDisabled := cli.BoolFlag{Name: "disable", Usage: "Recorder disable"}
 	recSubcommands := []cli.Command{
-		{Name: "create", Aliases: []string{"add"}, Usage: "Create recorder", Flags: []cli.Flag{recNameFlag, recFnsFlag, recTriggersFlag, recRetentionPolFlag, recEvictionPolFlag, specSaveFlag}, Action: recorderCreate},
+		{Name: "create", Aliases: []string{"add"}, Usage: "Create recorder", Flags: []cli.Flag{recNameFlag, recFnFlag, recTriggersFlag, recRetentionPolFlag, recEvictionPolFlag, specSaveFlag}, Action: recorderCreate},
 		{Name: "get", Usage: "Get recorder", Flags: []cli.Flag{recNameFlag}, Action: recorderGet},
-		{Name: "update", Usage: "Update recorder", Flags: []cli.Flag{recNameFlag, recFnsFlag, recTriggersFlag, recRetentionPolFlag, recEvictionPolFlag, recEnabled, recDisabled}, Action: recorderUpdate},
+		{Name: "update", Usage: "Update recorder", Flags: []cli.Flag{recNameFlag, recFnFlag, recTriggersFlag, recRetentionPolFlag, recEvictionPolFlag, recEnabled, recDisabled}, Action: recorderUpdate},
 		{Name: "delete", Usage: "Delete recorder", Flags: []cli.Flag{recNameFlag, recorderNamespaceFlag}, Action: recorderDelete},
 		{Name: "list", Usage: "List recorders", Flags: []cli.Flag{}, Action: recorderList},
 	}
 
-	filterTime := cli.StringFlag{Name: "from", Usage: "Filter records by time"}
+	filterTimeFrom := cli.StringFlag{Name: "from", Usage: "Filter records by time interval; specify start of interval"}
+	filterTimeTo := cli.StringFlag{Name: "to", Usage: "Filter records by time interval; specify end of interval"}
 	filterFunction := cli.StringFlag{Name: "function", Usage: "Filter records by function"}
+	filterTrigger := cli.StringFlag{Name: "trigger", Usage: "Filter records by trigger"}
 	recViewSubcommands := []cli.Command{
-		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTime, filterFunction}, Action: recordsView},
+		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTimeTo, filterTimeFrom, filterFunction, filterTrigger}, Action: recordsView},
 	}
 
 	// environments

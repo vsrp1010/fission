@@ -47,11 +47,11 @@ func recorderCreate(c *cli.Context) error {
 	//	fatal("Need to specify at least one function or one trigger, use --function, --trigger")
 	//}
 
-	var function v1.FunctionReference
-	function = v1.FunctionReference{
-				Type: "name",
-				Name: fnName,
-			}
+	//var function v1.FunctionReference
+	//function = v1.FunctionReference{
+	//			Type: "name",
+	//			Name: fnName,
+	//		}
 
 	var triggers []v1.TriggerReference
 	if len(triggersOriginal) != 0 {
@@ -74,7 +74,7 @@ func recorderCreate(c *cli.Context) error {
 		},
 		Spec: fission.RecorderSpec{
 			Name:            recName,
-			Function:        function, 	// TODO
+			Function:        fnName, 	// TODO
 			Triggers:        triggers,		// TODO
 			RetentionPolicy: retPolicy,
 			EvictionPolicy:  evictPolicy,
@@ -122,7 +122,7 @@ func recorderGet(c *cli.Context) error {
 }
 
 // TODO: Functions
-func recorderUpdate(c *cli.Context) error {
+func 	recorderUpdate(c *cli.Context) error {
 	client := getClient(c.GlobalString("server"))
 
 	recName := c.String("name")
@@ -133,6 +133,8 @@ func recorderUpdate(c *cli.Context) error {
 	evictPolicy := c.String("eviction")
 	enable := c.Bool("enable")
 	disable := c.Bool("disable")
+	triggers := c.StringSlice("trigger")
+	function := c.String("function")
 
 	recorder, err := client.RecorderGet(&metav1.ObjectMeta{
 		Name: recName,
@@ -140,7 +142,11 @@ func recorderUpdate(c *cli.Context) error {
 	})
 
 	if enable && disable {
-		fatal("Cannot enable and disable a recorder simultaneously.")
+		fatal("cannot enable and disable a recorder simultaneously.")
+	}
+
+	if !enable && !disable && len(triggers) == 0 && len(function) == 0 {
+		fatal("need to specify either a function or trigger(s) for this recorder")
 	}
 
 	updated := false
@@ -157,8 +163,26 @@ func recorderUpdate(c *cli.Context) error {
 		recorder.Spec.Enabled = true
 		updated = true		// TODO: This is a very shallow check. It may already be enabled.
 	}
+	// fatal("Made it to here without problems")
+
 	if disable {
 		recorder.Spec.Enabled = false
+		updated = true
+	}
+
+	if len(triggers) > 0 {
+		var newTriggers []v1.TriggerReference
+		triggs := strings.Split(triggers[0], ",")
+		for _, name := range triggs {
+			newTriggers = append(newTriggers, v1.TriggerReference{
+				Name: name,
+			})
+		}
+		recorder.Spec.Triggers = newTriggers
+		updated = true
+	}
+	if len(function) > 0 {
+		recorder.Spec.Function = function
 		updated = true
 	}
 

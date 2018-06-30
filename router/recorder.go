@@ -5,10 +5,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sCache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/rest"
-
-	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"time"
+	log "github.com/sirupsen/logrus"
 )
 
 type RecorderSet struct {
@@ -70,7 +69,7 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	// If triggers are not explicitly specified during the creation of this recorder,
 	// keep track of those associated with the function(s) specified [implicitly added triggers]
 	needTrack := len(triggers) == 0
-	trackFunction := make(map[fission.FunctionReference]bool)
+	trackFunction := make(map[string]bool)
 
 	//log.Info("New recorder ! Need track? ", needTrack)
 
@@ -85,7 +84,7 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 		}
 	}
 	*/
-	rs.functionRecorderMap[function.Name] = r
+	rs.functionRecorderMap[function] = r
 	if needTrack {
 		trackFunction[function] = true
 	}
@@ -94,19 +93,18 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	if needTrack {
 		for _, t := range rs.parent.triggerStore.List() {
 			trigger := *t.(*crd.HTTPTrigger)
-			if trackFunction[trigger.Spec.FunctionReference] {
+			if trackFunction[trigger.Spec.FunctionReference.Name] {
 				rs.triggerRecorderMap[trigger.Metadata.Name] = r
 			}
 		}
-	}
-
-	if len(triggers) != 0 {
+	} else {
+		// Only record for the explicitly added triggers otherwise
 		for _, trigger := range triggers {
 			rs.triggerRecorderMap[trigger.Name] = r
 		}
 	}
 
-	//log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
+	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
 	//log.Info("See updated function map: ", keys(rs.functionRecorderMap))
 }
 
@@ -126,7 +124,7 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 
 	//if len(functions) != 0 {
 	//	for _, function := range functions {
-			delete(rs.functionRecorderMap, function.Name)		// Alternatively set the value to false
+			delete(rs.functionRecorderMap, function)		// Alternatively set the value to false
 			//rs.functionRecorderMap[function.Name] = nil
 	//	}
 	//}

@@ -31,7 +31,7 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
-	logrus "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/fission/fission/redis"
 	"strings"
 	"github.com/satori/go.uuid"
@@ -174,11 +174,13 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 				go roundTripper.funcHandler.tapService(serviceUrl)
 			}
 
+			trigger := "trigonometry"		// TODO: Better default, test case
 			if roundTripper.funcHandler.httpTrigger != nil {
 				if len(roundTripper.funcHandler.httpTrigger.Spec.RelativeURL) == 0 {
 					log.Print("Couldn't find the trigger!")
 				} else {
 					log.Print("Found it: ", roundTripper.funcHandler.httpTrigger.Spec.RelativeURL)
+					trigger = roundTripper.funcHandler.httpTrigger.Metadata.Name
 				}
 			} else {
 				log.Println("It is nil, what can you do?")
@@ -186,7 +188,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 
 			// TODO: Stop recording -- find the correct placement for this
 			redis.EndRecord(
-				"trigonometry",
+				trigger,
 				roundTripper.funcHandler.recorderName,
 				roundTripper.reqUID, req, resp, roundTripper.funcHandler.function.Namespace,
 				time.Now().UnixNano(),
@@ -243,6 +245,7 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 		log.Print("Not nil here")
 		log.Print(fh.httpTrigger.Spec.RelativeURL)
 	}
+
 	if fh.recorderName != "" {
 		logrus.Info("Begin recording!")
 		UID := strings.ToLower(uuid.NewV4().String())
@@ -250,7 +253,7 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 		request.Header.Add("X-Fission-Recorder", reqUID)
 		// reqUID = redis.BeginRecord(fh.function, request)
 	} else {
-		logrus.Info("Don't begin recording.")
+		logrus.Info("Don't begin recording")
 	}
 
 	// system params
