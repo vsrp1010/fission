@@ -36,10 +36,11 @@ func recordsAll(c *cli.Context) error {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
-	fmt.Fprintf(w, "%v\n",
-		"REQUID")
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
+		"REQUID", "REQUEST METHOD", "FUNCTION", "RESPONSE STATUS", "TRIGGER")
 	for _, record := range records {
-		fmt.Fprintf(w, "%v\n", record)
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
+			record.ReqUID, record.Req.Method, record.Req.Header["X-Fission-Function-Name"], record.Resp.Status, record.Trigger)
 	}
 	w.Flush()
 
@@ -54,10 +55,11 @@ func recordsByTrigger(trigger string, c *cli.Context) error {
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
-	fmt.Fprintf(w, "%v\n",
-		"REQUID")
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
+		"REQUID", "REQUEST METHOD", "FUNCTION", "RESPONSE STATUS", "TRIGGER")
 	for _, record := range records {
-		fmt.Fprintf(w, "%v\n", record)
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\n",
+			record.ReqUID, record.Req.Method, record.Req.Header["X-Fission-Function-Name"], record.Resp.Status, record.Trigger)
 	}
 	w.Flush()
 

@@ -8,9 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/fission/fission/redis/build/gen"
 	"strings"
-	"strconv"
-	"time"
-	"fmt"
 )
 
 func NewClient() redis.Conn {
@@ -65,7 +62,7 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 	ureq := &redisCache.UniqueRequest {
 		Req: req,
 		Resp: resp,
-		Trigger: triggerName,
+		Trigger: triggerName,			// TODO: Why is this here when Trigger is set as a separate field?
 	}
 
 	data, err := proto.Marshal(ureq)
@@ -82,52 +79,4 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 	if err != nil {
 		panic(err)
 	}
-
-}
-
-// Currently only prints the records from the past n seconds
-// TODO: Units of start and end time specified by user?
-func FilterByTime(pastN float64) error {
-	// Needs to scan all records, converting each record's nanosecond int64 timestamp to time.Time type
-	// and subtract that time from time.Now() to see if it's within pastN seconds. If so, print that record.
-
-	client := NewClient()
-
-	iter := 0
-	var keys []string
-	for {
-		arr, err := redis.Values(client.Do("SCAN", iter))
-		if err != nil {
-			//log.Fatal(err)
-			return err
-		}
-		iter, _ = redis.Int(arr[0], nil)
-		k, _ := redis.Strings(arr[1], nil)
-		keys = append(keys, k...)
-
-		if iter == 0 {
-			break
-		}
-	}
-
-	now := time.Unix(0, int64(time.Now().UnixNano()))
-	var filtered []string
-
-	for _, key := range keys {
-		val, err := redis.Strings(client.Do("HMGET", key, "Timestamp"))
-		if err != nil {
-			// log.Fatal(err)
-			return err
-		}
-		ts, _ := strconv.Atoi(val[0]) 				// TODO: Get int64 precision from here
-		uts := time.Unix(0, int64(ts))
-		difference := now.Sub(uts).Seconds()
-		fmt.Println(fmt.Sprintf("Recorded %v %v seconds ago: ", key, difference))
-		if difference < pastN {
-			filtered = append(filtered, key)
-		}
-	}
-
-	log.Info("Filtered reqUIDs: ", filtered)
-	return nil
 }

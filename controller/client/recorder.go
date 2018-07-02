@@ -26,6 +26,7 @@ import (
 	"github.com/fission/fission/crd"
 	fv1 "github.com/fission/fission/pkg/apis/fission.io/v1"
 	"bytes"
+	"github.com/fission/fission/redis/build/gen"
 )
 
 func (c *Client) RecorderCreate(r *crd.Recorder) (*metav1.ObjectMeta, error) {
@@ -177,7 +178,8 @@ func (c *Client) RecordsByFunction(function string) ([]string, error) {
 	return records, nil
 }
 
-func (c *Client) RecordsAll() ([]string, error) {
+//func (c *Client) RecordsAll() ([]string, error) {
+func (c *Client) RecordsAll() ([]*redisCache.RecordedEntry, error) {
 	relativeUrl := "records"
 
 	resp, err := http.Get(c.url(relativeUrl))
@@ -191,7 +193,9 @@ func (c *Client) RecordsAll() ([]string, error) {
 		return nil, err
 	}
 
-	records := make([]string, 0)
+	//records := make([]string, 0)
+	// Does this work?
+	records := make([]*redisCache.RecordedEntry, 0)
 	err = json.Unmarshal(body, &records)
 	if err != nil {
 		return nil, err
@@ -200,7 +204,7 @@ func (c *Client) RecordsAll() ([]string, error) {
 	return records, nil
 }
 
-func (c *Client) RecordsByTrigger(trigger string) ([]string, error) {
+func (c *Client) RecordsByTrigger(trigger string) ([]*redisCache.RecordedEntry, error) {
 	relativeUrl := "records/trigger/"
 	relativeUrl += fmt.Sprintf(trigger)
 	//relativeUrl += fmt.Sprintf("?trigger=%v", trigger)
@@ -216,7 +220,7 @@ func (c *Client) RecordsByTrigger(trigger string) ([]string, error) {
 		return nil, err
 	}
 
-	records := make([]string, 0)
+	records := make([]*redisCache.RecordedEntry, 0)
 	err = json.Unmarshal(body, &records)
 	if err != nil {
 		return nil, err

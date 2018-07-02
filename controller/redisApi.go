@@ -12,7 +12,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gorilla/mux"
+	"github.com/golang/protobuf/proto"
 	"github.com/fission/fission/pkg/apis/fission.io/v1"
+	"github.com/fission/fission/redis/build/gen"
 )
 
 func NewClient() redis.Conn {
@@ -23,11 +25,29 @@ func NewClient() redis.Conn {
 	return c
 }
 
+// TODO: Discuss this approach of using two different protobuf message formats
+func deserializeReqResponse(value []byte, reqUID string) (*redisCache.RecordedEntry, error) {
+	data := &redisCache.UniqueRequest{}
+	err := proto.Unmarshal(value, data)
+	if err != nil {
+		log.Fatal("Unmarshalling ReqResponse error: ", err)
+	}
+	log.Info("Parsed protobuf bytes: ", data)
+	transformed := &redisCache.RecordedEntry{
+		ReqUID: reqUID,
+		Req: data.Req,
+		Resp: data.Resp,
+		Trigger: data.Trigger,
+	}
+	return transformed, nil
+}
+
 func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 	client := NewClient()
 
 	iter := 0
-	var filtered []string
+	//var filtered []string
+	var filtered []*redisCache.RecordedEntry		// Pointer?
 
 	for {
 		arr, err := redis.Values(client.Do("SCAN", iter))
@@ -38,7 +58,15 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 		k, _ := redis.Strings(arr[1], nil)
 		for _, key := range k {
 			if strings.HasPrefix(key, "REQ") {
-				filtered = append(filtered, key)
+				val, err := redis.Bytes(client.Do("HGET", key, "ReqResponse"))
+				if err != nil {
+					log.Fatal(err)
+				}
+				entry, err := deserializeReqResponse(val, key)
+				if err != nil {
+					log.Fatal(err)
+				}
+				filtered = append(filtered, entry)
 			}
 		}
 
@@ -47,7 +75,7 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Info("Printing records: ", filtered)
+	//log.Info("Printing records: ", filtered)
 
 	resp, err := json.Marshal(filtered)
 	if err != nil {
@@ -56,56 +84,6 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 	}
 	a.respondWithSuccess(w, resp)
 }
-
-/*
-func wellFormedTime(time string) (int64, error) {
-	r, err := regexp.Compile(`^\d*[hsmd]$`)
-
-	if err != nil {
-		return -1, errors.New("There is a problem with your regexp.\n")
-	}
-
-	rd, err := regexp.Compile(`[^\d]`)
-	if err != nil {
-		return -1, errors.New("There is a problem with your regexp.\n")
-	}
-
-	num := rd.Split(time,-1)[0]
-
-	// Checks input matches pattern
-	// Checks that lengths add up (any number of digits + single character) == len(input)
-	// || len(num) + 1 != len(time)
-	if !r.MatchString(time) {
-		return -1, errors.New("Improperly formed time input")
-	}
-
-	digit, err := strconv.Atoi(num)
-	if err != nil {
-		return -1, err
-	}
-
-	log.Info("Matched pattern, got digit: ", digit, " and unit: ", time[len(time)-1])
-	return int64(digit), nil
-}
-
-func unit(c string) time.Duration {
-	if len(c) != 1 {
-		log.Fatal("Can't interpret unit")
-	}
-	switch c {
-	case "s":
-		return time.Second
-	case "m":
-		return time.Minute
-	case "h":
-		return time.Hour
-	case "d":
-		return 24 * time.Hour
-	default:
-		return time.Hour		//TODO: Think of this case
-	}
-}
-*/
 
 func validateSplit(timeInput string) (int64, time.Duration, error) {
 	num := timeInput[0:len(timeInput)-1]
@@ -155,24 +133,18 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//fromMultiplier := 24
-	//fromUnit := time.Hour
-	//
-	//toMultiplier := 0
-	//toUnit := time.Hour
-
 	now := time.Now()
-	year, month, day := now.Date()
-	d := time.Date(year, month, day, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC)	// TODO: Location
+	//year, month, day := now.Date()
+	//d := time.Date(year, month, day, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC)	// TODO: Location
 	then := now.Add(time.Duration(-fromMultiplier) * fromUnit)
 
-	log.Info("Range fromInput: %v, toInput: %v", then, d)
 	rangeStart := then.UnixNano()
-	log.Info("Start range: ", rangeStart)
 
 	// End Range
 	until := now.Add(time.Duration(-toMultiplier) * toUnit)
 	rangeEnd := until.UnixNano()
+
+	log.Info("Searching interval, from: ", then, ", to: ", until)
 
 	client := NewClient()
 
@@ -248,8 +220,10 @@ func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) 
 
 	client := NewClient()
 
-	var filteredReqUIDs []string
+	var filtered []*redisCache.RecordedEntry
 
+	// TODO: Account for old/not-yet-deleted entries in the recorder lists
+	// Perhaps create a goroutine for cleaning up these missing values
 	for _, key := range matchingRecorders {
 		val, err := redis.Strings(client.Do("LRANGE", key, "0", "-1"))   // TODO: Prefix that distinguishes recorder lists
 		if err != nil {
@@ -261,13 +235,22 @@ func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) 
 				log.Fatal(err)
 			}
 			if val[0] == trigger {
-				filteredReqUIDs = append(filteredReqUIDs, reqUID)
+				// TODO: Reconsider multiple commands
+				val, err := redis.Bytes(client.Do("HGET", reqUID, "ReqResponse"))
+				if err != nil {
+					log.Fatal(err)
+				}
+				entry, err := deserializeReqResponse(val, key)
+				if err != nil {
+					log.Fatal(err)
+				}
+				filtered = append(filtered, entry)
 			}
 		}
 	}
 
 	// Placeholder
-	resp, err := json.Marshal(filteredReqUIDs)
+	resp, err := json.Marshal(filtered)
 	if err != nil {
 		a.respondWithError(w, err)
 		return
@@ -282,10 +265,6 @@ func includesTrigger(triggers []v1.TriggerReference, query string) bool {
 		}
 	}
 	return false
-}
-
-func (a *API) RecordsApiAll(w http.ResponseWriter, r *http.Request) {
-
 }
 
 func (a *API) RecordsApiFilterByFunction(w http.ResponseWriter, r *http.Request) {
