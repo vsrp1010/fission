@@ -18,7 +18,9 @@ import (
 )
 
 func NewClient() redis.Conn {
-	c, err := redis.Dial("tcp", "10.103.152.70:6379")
+	// TODO: Load redis ClusterIP from environment variable / configmap
+	// TODO: There are two of these functions in different packages -- import?
+	c, err := redis.Dial("tcp", "10.102.223.159:6379")
 	if err != nil {
 		log.Fatalf("Could not connect: %v\n", err)
 	}
@@ -134,13 +136,9 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	//year, month, day := now.Date()
-	//d := time.Date(year, month, day, now.Hour(), now.Minute(), now.Second(), now.Nanosecond(), time.UTC)	// TODO: Location
 	then := now.Add(time.Duration(-fromMultiplier) * fromUnit)
-
 	rangeStart := then.UnixNano()
 
-	// End Range
 	until := now.Add(time.Duration(-toMultiplier) * toUnit)
 	rangeEnd := until.UnixNano()
 
@@ -149,7 +147,7 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	client := NewClient()
 
 	iter := 0
-	var filtered []string
+	var filtered []*redisCache.RecordedEntry
 
 	for {
 		arr, err := redis.Values(client.Do("SCAN", iter))
@@ -168,7 +166,15 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 				tsO, _ := strconv.Atoi(val[0])				// TODO: Get int64 precision fromInput here
 				ts := int64(tsO)
 				if ts > rangeStart && ts < rangeEnd {
-					filtered = append(filtered, key)
+					val2, err := redis.Bytes(client.Do("HGET", key, "ReqResponse"))
+					if err != nil {
+						log.Fatal(err)
+					}
+					entry, err := deserializeReqResponse(val2, key)
+					if err != nil {
+						log.Fatal(err)
+					}
+					filtered = append(filtered, entry)
 				}
 			}
 		}
@@ -185,6 +191,7 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	}
 	a.respondWithSuccess(w, resp)
 }
+
 
 func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -227,6 +234,7 @@ func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) 
 	for _, key := range matchingRecorders {
 		val, err := redis.Strings(client.Do("LRANGE", key, "0", "-1"))   // TODO: Prefix that distinguishes recorder lists
 		if err != nil {
+			// TODO: Handle deleted recorder? Or is this a non-issue because our list of recorders is up to date?
 			a.respondWithError(w, err)
 		}
 		for _, reqUID := range val {
@@ -240,7 +248,7 @@ func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) 
 				if err != nil {
 					log.Fatal(err)
 				}
-				entry, err := deserializeReqResponse(val, key)
+				entry, err := deserializeReqResponse(val, reqUID)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -249,7 +257,6 @@ func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	// Placeholder
 	resp, err := json.Marshal(filtered)
 	if err != nil {
 		a.respondWithError(w, err)
@@ -292,18 +299,36 @@ func (a *API) RecordsApiFilterByFunction(w http.ResponseWriter, r *http.Request)
 
 	client := NewClient()
 
-	var filteredReqUIDs []string
+	//var filteredReqUIDs []string
+	var filtered []*redisCache.RecordedEntry
 
 	for _, key := range matchingRecorders {
 		val, err := redis.Strings(client.Do("LRANGE", key, "0", "-1"))   // TODO: Prefix that distinguishes recorder lists
 		if err != nil {
 			a.respondWithError(w, err)
 		}
-		// filteredReqUIDs = append(filteredReqUIDs, strings.Join(val, ","))
-		filteredReqUIDs = append(filteredReqUIDs, val...)
+		//filteredReqUIDs = append(filteredReqUIDs, val...)
+		for _, reqUID := range val {
+			// TODO: Check if it still exists, else clean up this value from the cache
+			exists, err := redis.Int(client.Do("EXISTS", reqUID))
+			if err != nil {
+				continue
+			}
+			if exists > 0 {
+				val, err := redis.Bytes(client.Do("HGET", reqUID, "ReqResponse"))
+				if err != nil {
+					log.Fatal(err)
+				}
+				entry, err := deserializeReqResponse(val, reqUID)
+				if err != nil {
+					log.Fatal(err)
+				}
+				filtered = append(filtered, entry)
+			}
+		}
 	}
 
-	resp, err := json.Marshal(filteredReqUIDs)
+	resp, err := json.Marshal(filtered)
 	if err != nil {
 		a.respondWithError(w, err)
 		return

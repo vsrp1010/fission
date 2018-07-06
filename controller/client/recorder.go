@@ -152,8 +152,8 @@ func (c *Client) RecorderList(ns string) ([]crd.Recorder, error) {
 	return recorders, nil
 }
 
-// TODO: Move to different file
-func (c *Client) RecordsByFunction(function string) ([]string, error) {
+// TODO: Move to different file?
+func (c *Client) RecordsByFunction(function string) ([]*redisCache.RecordedEntry, error) {
 	relativeUrl := "records/function/"
 	relativeUrl += fmt.Sprintf(function)
 
@@ -169,7 +169,7 @@ func (c *Client) RecordsByFunction(function string) ([]string, error) {
 		return nil, err
 	}
 
-	records := make([]string, 0)
+	records := make([]*redisCache.RecordedEntry, 0)
 	err = json.Unmarshal(body, &records)
 	if err != nil {
 		return nil, err
@@ -229,10 +229,7 @@ func (c *Client) RecordsByTrigger(trigger string) ([]*redisCache.RecordedEntry, 
 	return records, nil
 }
 
-func (c *Client) RecordsByTime(from string, to string) ([]string, error) {
-	//relativeUrl := "records/time/"
-	//relativeUrl += fmt.Sprintf(from)
-	//relativeUrl += fmt.Sprintf("?to=%v", to)
+func (c *Client) RecordsByTime(from string, to string) ([]*redisCache.RecordedEntry, error) {
 	relativeUrl := "records/time"
 	relativeUrl += fmt.Sprintf("?from=%v&to=%v", from, to)
 
@@ -247,7 +244,7 @@ func (c *Client) RecordsByTime(from string, to string) ([]string, error) {
 		return nil, err
 	}
 
-	records := make([]string, 0)
+	records := make([]*redisCache.RecordedEntry, 0)
 	err = json.Unmarshal(body, &records)
 	if err != nil {
 		return nil, err

@@ -209,8 +209,10 @@ func main() {
 	filterTimeTo := cli.StringFlag{Name: "to", Usage: "Filter records by time interval; specify end of interval"}
 	filterFunction := cli.StringFlag{Name: "function", Usage: "Filter records by function"}
 	filterTrigger := cli.StringFlag{Name: "trigger", Usage: "Filter records by trigger"}
+	verbosityFlag := cli.BoolFlag{Name: "v", Usage: "Toggle verbosity -- view more detailed requests/responses"}
+	vvFlag := cli.BoolFlag{Name: "vv", Usage: "Toggle verbosity -- view raw requests/responses"}
 	recViewSubcommands := []cli.Command{
-		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTimeTo, filterTimeFrom, filterFunction, filterTrigger}, Action: recordsView},
+		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTimeTo, filterTimeFrom, filterFunction, filterTrigger, verbosityFlag, vvFlag}, Action: recordsView},
 	}
 
 	// environments

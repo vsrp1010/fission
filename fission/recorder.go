@@ -122,7 +122,7 @@ func recorderGet(c *cli.Context) error {
 }
 
 // TODO: Functions
-func 	recorderUpdate(c *cli.Context) error {
+func recorderUpdate(c *cli.Context) error {
 	client := getClient(c.GlobalString("server"))
 
 	recName := c.String("name")
@@ -220,7 +220,6 @@ func recorderList(c *cli.Context) error {
 	// TODO: Namespace
 
 	recorders, err := client.RecorderList("default")
-
 	checkErr(err, "list recorders")
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)

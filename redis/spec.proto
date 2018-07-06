@@ -25,6 +25,7 @@ message UniqueRequest {
 // We need this because we don't store the ReqUID in the above Message (UniqueRequest)
 // and we don't store the UID there because the key in Redis is the ReqUID -- including it in the value would be
 // unnecessary duplication
+// but we need it here because we want to display to the user the ReqResponses for a given ReqUID
 message RecordedEntry {
     string ReqUID = 13;
     Request Req = 14;

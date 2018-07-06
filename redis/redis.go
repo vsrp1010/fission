@@ -11,7 +11,8 @@ import (
 )
 
 func NewClient() redis.Conn {
-	c, err := redis.Dial("tcp", "10.103.152.70:6379")
+	// TODO: Load redis ClusterIP from environment variable / configmap
+	c, err := redis.Dial("tcp", "10.102.223.159:6379")
 	if err != nil {
 		log.Fatalf("Could not connect: %v\n", err)
 	}

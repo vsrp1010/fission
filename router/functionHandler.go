@@ -174,16 +174,13 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 				go roundTripper.funcHandler.tapService(serviceUrl)
 			}
 
-			trigger := "trigonometry"		// TODO: Better default, test case
+			trigger := ""		// TODO: Better default, test case
 			if roundTripper.funcHandler.httpTrigger != nil {
-				if len(roundTripper.funcHandler.httpTrigger.Spec.RelativeURL) == 0 {
-					log.Print("Couldn't find the trigger!")
-				} else {
-					log.Print("Found it: ", roundTripper.funcHandler.httpTrigger.Spec.RelativeURL)
+				if len(roundTripper.funcHandler.httpTrigger.Spec.RelativeURL) != 0 {
 					trigger = roundTripper.funcHandler.httpTrigger.Metadata.Name
 				}
 			} else {
-				log.Println("It is nil, what can you do?")
+				log.Println("No trigger attached.")	// Wording?
 			}
 
 			// TODO: Stop recording -- find the correct placement for this
@@ -242,7 +239,6 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 	}
 	var reqUID string
 	if fh.httpTrigger != nil {
-		log.Print("Not nil here")
 		log.Print(fh.httpTrigger.Spec.RelativeURL)
 	}
 
