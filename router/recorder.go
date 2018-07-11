@@ -73,17 +73,6 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 
 	//log.Info("New recorder ! Need track? ", needTrack)
 
-	/*
-	if len(functions) != 0 {
-		for _, function := range functions {
-			rs.functionRecorderMap[function.Name] = r
-			// If we
-			if needTrack {
-				trackFunction[function] = true
-			}
-		}
-	}
-	*/
 	rs.functionRecorderMap[function] = r
 	if needTrack {
 		trackFunction[function] = true
@@ -120,33 +109,38 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	function := r.Spec.Function
 	triggers := r.Spec.Triggers
 
-	//log.Info("Disabling recorder !")
+	log.Info("Disabling recorder !")
 
-	//if len(functions) != 0 {
-	//	for _, function := range functions {
-			delete(rs.functionRecorderMap, function)		// Alternatively set the value to false
-			//rs.functionRecorderMap[function.Name] = nil
-	//	}
-	//}
+	delete(rs.functionRecorderMap, function)		// Alternatively set the value to false
 
+	// Account for explicitly added triggers
 	if len(triggers) != 0 {
 		for _, trigger := range triggers {
 			delete(rs.triggerRecorderMap, trigger.Name)
-			// rs.triggerRecorderMap[trigger.Name] = nil
 		}
 	}
+
+	// Account for implicitly added triggers
+	for _, t := range rs.parent.triggerStore.List() {
+		trigger := *t.(*crd.HTTPTrigger)
+		if trigger.Spec.FunctionReference.Name == function {
+			delete(rs.triggerRecorderMap, trigger.Metadata.Name)	// Use function defined for this purpose below?
+		}
+	}
+
 	// Reset doRecord
 	rs.parent.forceNewRouter()
 
-	//log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
-	//log.Info("See updated function map: ", keys(rs.functionRecorderMap))
+	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
+	log.Info("See updated function map: ", keys(rs.functionRecorderMap))
 }
 
 func (rs *RecorderSet) updateRecorder(old *crd.Recorder, new *crd.Recorder) {
 	if new.Spec.Enabled == true {
-		rs.newRecorder(new)
+		//rs.disableRecorder(old)
+		rs.newRecorder(old)				// TODO: Test this
 	} else {
-		rs.disableRecorder(new)
+		rs.disableRecorder(old)
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/fission/fission/pkg/apis/fission.io/v1"
 	"github.com/fission/fission/redis/build/gen"
+	"github.com/fission/fission/replayer"
 )
 
 func NewClient() redis.Conn {
@@ -32,9 +33,10 @@ func deserializeReqResponse(value []byte, reqUID string) (*redisCache.RecordedEn
 	data := &redisCache.UniqueRequest{}
 	err := proto.Unmarshal(value, data)
 	if err != nil {
-		log.Fatal("Unmarshalling ReqResponse error: ", err)
+		// log.Fatal("Unmarshalling ReqResponse error: ", err)
+		return nil, err
 	}
-	log.Info("Parsed protobuf bytes: ", data)
+	//log.Info("Parsed protobuf bytes: ", data)
 	transformed := &redisCache.RecordedEntry{
 		ReqUID: reqUID,
 		Req: data.Req,
@@ -48,7 +50,6 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 	client := NewClient()
 
 	iter := 0
-	//var filtered []string
 	var filtered []*redisCache.RecordedEntry		// Pointer?
 
 	for {
@@ -76,8 +77,6 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-
-	//log.Info("Printing records: ", filtered)
 
 	resp, err := json.Marshal(filtered)
 	if err != nil {
@@ -333,5 +332,47 @@ func (a *API) RecordsApiFilterByFunction(w http.ResponseWriter, r *http.Request)
 		a.respondWithError(w, err)
 		return
 	}
+	a.respondWithSuccess(w, resp)
+}
+
+// For replayer -- move?
+func (a *API) ReplayByReqUID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	query := vars["reqUID"]
+
+	log.Info("In controller, asked to replay: ", query)
+
+	// Namespace?
+	client := NewClient()
+
+	exists, err := redis.Int(client.Do("EXISTS", query))
+	if exists != 1 || err != nil {
+		a.respondWithError(w, errors.New("couldn't find request to replay"))
+		return
+	}
+
+	val, err := redis.Bytes(client.Do("HGET", query, "ReqResponse"))
+	if err != nil {
+		a.respondWithError(w, errors.New("couldn't obtain ReqResponse for this ID"))
+		return
+	}
+	entry, err := deserializeReqResponse(val, query)
+	if err != nil {
+		a.respondWithError(w, errors.New("couldn't deserialize ReqResponse"))
+		return
+	}
+
+	replayed, err := replayer.ReplayRequest(entry.Req)
+	if err != nil {
+		a.respondWithError(w, errors.New("couldn't replay request"))
+		return
+	}
+
+	resp, err := json.Marshal(replayed)
+	if err != nil {
+		a.respondWithError(w, errors.New("couldn't marshall replayed request response"))
+		return
+	}
+
 	a.respondWithSuccess(w, resp)
 }

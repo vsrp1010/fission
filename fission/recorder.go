@@ -32,8 +32,15 @@ import (
 )
 
 func recorderCreate(c *cli.Context) error {
-	// TODO: Understand which client
 	client := getClient(c.GlobalString("server"))
+
+	enable := c.Bool("enable")
+	disable := c.Bool("disable")
+
+	// There is no point in creating a disabled recorder
+	if enable || disable {
+		fatal("Newly created recorders will be enabled, to disable an existing recorder use `recorder update` instead")
+	}
 
 	recName := c.String("name")
 	if len(recName) == 0 {
@@ -42,10 +49,16 @@ func recorderCreate(c *cli.Context) error {
 	fnName := c.String("function")
 	triggersOriginal := c.StringSlice("trigger")
 
-	// TODO: XOR
-	//if len(fnsOriginal) == 0 && len(triggersOriginal) == 0 {
-	//	fatal("Need to specify at least one function or one trigger, use --function, --trigger")
-	//}
+	// Function XOR triggers can be given
+	if len(fnName) == 0 && len(triggersOriginal) == 0 {
+		fatal("Need to specify at least one function or one trigger, use --function, --trigger")
+	}
+	if len(fnName) != 0 && len(triggersOriginal) != 0 {
+		fatal("Can specify either one function or one or more triggers, but not both")
+	}
+
+	// TODO: Validate here or elsewhere that all triggers belong to the same namespace
+	// TODO: Use strings to store function/triggers (name only) or another custom type (that includes the namespace)?
 
 	//var function v1.FunctionReference
 	//function = v1.FunctionReference{
@@ -55,17 +68,18 @@ func recorderCreate(c *cli.Context) error {
 
 	var triggers []v1.TriggerReference
 	if len(triggersOriginal) != 0 {
-		triggs := strings.Split(triggersOriginal[0], ",")
-		for _, name := range triggs {
+		ts := strings.Split(triggersOriginal[0], ",")
+		for _, name := range ts {
 			triggers = append(triggers, v1.TriggerReference{
 				Name: name,
 			})
 		}
 	}
-	// TODO Define appropriate set of policies and defaults
+	// TODO: Define appropriate set of policies and defaults
 	retPolicy := c.String("retention")
 	evictPolicy := c.String("eviction")
-	// TODO Check namespace if required
+
+	// TODO: Check namespace if required
 
 	recorder := &crd.Recorder{
 		Metadata: metav1.ObjectMeta{
@@ -74,8 +88,8 @@ func recorderCreate(c *cli.Context) error {
 		},
 		Spec: fission.RecorderSpec{
 			Name:            recName,
-			Function:        fnName, 	// TODO
-			Triggers:        triggers,		// TODO
+			Function:        fnName, 	// TODO; type
+			Triggers:        triggers,	// TODO; type
 			RetentionPolicy: retPolicy,
 			EvictionPolicy:  evictPolicy,
 			Enabled:         true,
@@ -126,31 +140,40 @@ func recorderUpdate(c *cli.Context) error {
 	client := getClient(c.GlobalString("server"))
 
 	recName := c.String("name")
+	enable := c.Bool("enable")
+	disable := c.Bool("disable")
+	retPolicy := c.String("retention")
+	evictPolicy := c.String("eviction")
+	triggers := c.StringSlice("trigger")
+	function := c.String("function")
+
+
+	if enable && disable {
+		fatal("Cannot enable and disable a recorder simultaneously.")
+	}
+
+	// Prevent enable or disable while trying to update other fields. These flags must be standalone.
+	if enable || disable {
+		if len(triggers) > 0 || len(function) > 0 || len(retPolicy) > 0 || len(evictPolicy) > 0 {
+			fatal("Enabling or disabling a recorder with other (non-name) flags set is not supported.")
+		}
+	} else if len(triggers) == 0 && len(function) == 0 {
+		fatal("Need to specify either a function or trigger(s) for this recorder")
+	}
+
 	if len(recName) == 0 {
 		fatal("Need name of recorder, use --name")
 	}
-	retPolicy := c.String("retention")
-	evictPolicy := c.String("eviction")
-	enable := c.Bool("enable")
-	disable := c.Bool("disable")
-	triggers := c.StringSlice("trigger")
-	function := c.String("function")
 
 	recorder, err := client.RecorderGet(&metav1.ObjectMeta{
 		Name: recName,
 		Namespace: "default",	// TODO
 	})
 
-	if enable && disable {
-		fatal("cannot enable and disable a recorder simultaneously.")
-	}
-
-	if !enable && !disable && len(triggers) == 0 && len(function) == 0 {
-		fatal("need to specify either a function or trigger(s) for this recorder")
-	}
-
 	updated := false
+
 	// TODO: Additional validation on type of supported retention policy, eviction policy
+
 	if len(retPolicy) > 0 {
 		recorder.Spec.RetentionPolicy = retPolicy
 		updated = true
@@ -161,9 +184,8 @@ func recorderUpdate(c *cli.Context) error {
 	}
 	if enable {
 		recorder.Spec.Enabled = true
-		updated = true		// TODO: This is a very shallow check. It may already be enabled.
+		updated = true
 	}
-	// fatal("Made it to here without problems")
 
 	if disable {
 		recorder.Spec.Enabled = false
@@ -181,6 +203,7 @@ func recorderUpdate(c *cli.Context) error {
 		recorder.Spec.Triggers = newTriggers
 		updated = true
 	}
+
 	if len(function) > 0 {
 		recorder.Spec.Function = function
 		updated = true
@@ -199,16 +222,20 @@ func recorderUpdate(c *cli.Context) error {
 
 func recorderDelete(c *cli.Context) error {
 	client := getClient(c.GlobalString("server"))
+
 	recName := c.String("name")
+
 	if len(recName) == 0 {
 		fatal("Need name of recorder to delete, use --name")
 	}
-	recNs := c.String("recorderns")
+
+	recNs := c.String("recorderns") // TODO: Namespace flag consistency with other commands
 
 	err := client.RecorderDelete(&metav1.ObjectMeta{
 		Name: recName,
 		Namespace: recNs,
 	})
+
 	checkErr(err, "delete recorder")
 
 	fmt.Printf("recorder '%v' deleted\n", recName)
@@ -234,9 +261,3 @@ func recorderList(c *cli.Context) error {
 
 	return nil
 }
-
-func recorderMoar(c *cli.Context) error {
-	fmt.Println(c.String("moar"))
-	return nil
-}
-

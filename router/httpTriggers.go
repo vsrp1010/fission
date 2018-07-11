@@ -30,7 +30,6 @@ import (
 	k8sCache "k8s.io/client-go/tools/cache"
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
-	"github.com/sirupsen/logrus"
 	"github.com/fission/fission"
 )
 
@@ -131,7 +130,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			recorder = ts.recorderSet.triggerRecorderMap[trigger.Metadata.Name].Spec.Name
 		}
 
-		log.Printf("The trigger %v should be recorded: %v (<-- empty?)", trigger.Metadata.Name, recorder)
+		//log.Printf("The trigger %v should be recorded: %v (<-- empty?)", trigger.Metadata.Name, recorder)
 
 		if rr.resolveResultType != resolveResultSingleFunction {
 			// not implemented yet
@@ -182,7 +181,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			executor: ts.executor,				// TODO: Need some kind of trigger reference for recording
 			recorderName: recorder,
 		}
-		logrus.Info("Created a functionHandler without a trigger for the function: ", function.Metadata.Name)
+		//logrus.Info("Created a functionHandler without a trigger for the function: ", function.Metadata.Name)
 
 		muxRouter.HandleFunc(fission.UrlForFunction(function.Metadata.Name, function.Metadata.Namespace), fh.handler)
 	}

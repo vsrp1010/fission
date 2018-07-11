@@ -83,6 +83,10 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	var needExecutor, serviceUrlFromExecutor bool
 	var serviceUrl *url.URL
 
+	// TODO: Keep?
+	var originalUrl url.URL
+	originalUrl = *req.URL
+
 	// Metrics stuff
 	startTime := time.Now()
 	funcMetricLabels := &functionLabels{
@@ -175,7 +179,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 			}
 
 			trigger := ""		// TODO: Better default, test case
-			if roundTripper.funcHandler.httpTrigger != nil {
+			if roundTripper.funcHandler.httpTrigger != nil {		// TODO: Duplicate check from above?
 				if len(roundTripper.funcHandler.httpTrigger.Spec.RelativeURL) != 0 {
 					trigger = roundTripper.funcHandler.httpTrigger.Metadata.Name
 				}
@@ -187,7 +191,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 			redis.EndRecord(
 				trigger,
 				roundTripper.funcHandler.recorderName,
-				roundTripper.reqUID, req, resp, roundTripper.funcHandler.function.Namespace,
+				roundTripper.reqUID, req, originalUrl, resp, roundTripper.funcHandler.function.Namespace,
 				time.Now().UnixNano(),
 				)
 			// return response back to user

@@ -225,8 +225,9 @@ func (api *API) Serve(port int) {
 	r.HandleFunc("/v2/records", api.RecordsApiListAll).Methods("GET")
 	r.HandleFunc("/v2/records/function/{function}", api.RecordsApiFilterByFunction).Methods("GET")
 	r.HandleFunc("/v2/records/trigger/{trigger}", api.RecordsApiFilterByTrigger).Methods("GET")
-	//r.HandleFunc("/v2/records/time/{from}", api.RecordsApiFilterByTime).Methods("GET")
 	r.HandleFunc("/v2/records/time", api.RecordsApiFilterByTime).Methods("GET")
+
+	r.HandleFunc("/v2/replay/{reqUID}", api.ReplayByReqUID).Methods("GET")
 
 	r.HandleFunc("/v2/secrets/{secret}", api.SecretGet).Methods("GET")
 	r.HandleFunc("/v2/configmaps/{configmap}", api.ConfigMapGet).Methods("GET")

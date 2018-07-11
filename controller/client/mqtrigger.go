@@ -26,6 +26,7 @@ import (
 
 	"github.com/fission/fission/crd"
 	fv1 "github.com/fission/fission/pkg/apis/fission.io/v1"
+	log "github.com/sirupsen/logrus"
 )
 
 func (c *Client) MessageQueueTriggerCreate(t *crd.MessageQueueTrigger) (*metav1.ObjectMeta, error) {
@@ -65,6 +66,7 @@ func (c *Client) MessageQueueTriggerGet(m *metav1.ObjectMeta) (*crd.MessageQueue
 
 	resp, err := http.Get(c.url(relativeUrl))
 	if err != nil {
+		log.Info("The problem happened here")
 		return nil, err
 	}
 	defer resp.Body.Close()

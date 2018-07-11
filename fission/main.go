@@ -190,6 +190,7 @@ func main() {
 	}
 
 	// TODO: Namespace flag?
+	// Recorders
 	recNameFlag := cli.StringFlag{Name: "name", Usage: "Recorder name"}
 	recFnFlag := cli.StringFlag{Name: "function", Usage: "Record Function name(s)"}
 	recTriggersFlag := cli.StringSliceFlag{Name: "trigger", Usage: "Record Trigger name(s)"}
@@ -205,6 +206,7 @@ func main() {
 		{Name: "list", Usage: "List recorders", Flags: []cli.Flag{}, Action: recorderList},
 	}
 
+	// View records
 	filterTimeFrom := cli.StringFlag{Name: "from", Usage: "Filter records by time interval; specify start of interval"}
 	filterTimeTo := cli.StringFlag{Name: "to", Usage: "Filter records by time interval; specify end of interval"}
 	filterFunction := cli.StringFlag{Name: "function", Usage: "Filter records by function"}
@@ -214,6 +216,9 @@ func main() {
 	recViewSubcommands := []cli.Command{
 		{Name: "view", Usage: "View existing records", Flags: []cli.Flag{filterTimeTo, filterTimeFrom, filterFunction, filterTrigger, verbosityFlag, vvFlag}, Action: recordsView},
 	}
+
+	// Replay records
+	reqIDFlag := cli.StringFlag{Name: "reqUID", Usage: "Replay a particular request by providing the reqUID (to view reqUIDs, do `fission records view`)"}
 
 	// environments
 	envNameFlag := cli.StringFlag{Name: "name", Usage: "Environment name"}
@@ -293,6 +298,7 @@ func main() {
 		{Name: "mqtrigger", Aliases: []string{"mqt", "messagequeue"}, Usage: "Manage message queue triggers for functions", Subcommands: mqtSubcommands},
 		{Name: "recorder", Usage: "Manage recorders for functions", Subcommands: recSubcommands},
 		{Name: "records", Usage: "View existing records", Subcommands: recViewSubcommands},
+		{Name: "replay", Usage: "Replay records", Flags: []cli.Flag{reqIDFlag}, Action: replay},
 		{Name: "environment", Aliases: []string{"env"}, Usage: "Manage environments", Subcommands: envSubcommands},
 		{Name: "watch", Aliases: []string{"w"}, Usage: "Manage watches", Subcommands: wSubCommands},
 		{Name: "package", Aliases: []string{"pkg"}, Usage: "Manage packages", Subcommands: pkgSubCommands},

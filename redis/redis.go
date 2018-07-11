@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/fission/fission/redis/build/gen"
 	"strings"
+	"net/url"
 )
 
 func NewClient() redis.Conn {
@@ -19,9 +20,18 @@ func NewClient() redis.Conn {
 	return c
 }
 
-func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, response *http.Response, namespace string, timestamp int64) {
+func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, originalUrl url.URL, response *http.Response, namespace string, timestamp int64) {
 	// Case where the function should not have been recorded
 	if len(reqUID) == 0 {
+		return
+	}
+
+	replayed := originalUrl.Query().Get("replayed")
+
+	log.Info("EndRecord: URL > ", originalUrl.String(), " with queries ", replayed)
+
+	if replayed == "true" {
+		log.Info("This was a replayed request.")
 		return
 	}
 
@@ -29,8 +39,7 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 
 	url := make(map[string]string)
 	url["Host"] = request.URL.Host
-	url["Path"] = request.URL.Path
-
+	url["Path"] = originalUrl.String()	// Previously request.URL.Path
 	header := make(map[string]string)
 	for key, value := range request.Header {
 		header[key] = strings.Join(value, ",")
