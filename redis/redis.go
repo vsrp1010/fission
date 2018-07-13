@@ -31,48 +31,30 @@ func NewClient() redis.Conn {
 	return c
 }
 
-func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, originalUrl url.URL, parsedBody string, response *http.Response, namespace string, timestamp int64) {
+func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, originalUrl url.URL, payload string, response *http.Response, namespace string, timestamp int64) {
 	// Case where the function should not have been recorded
 	if len(reqUID) == 0 {
 		return
 	}
-
 	replayed := originalUrl.Query().Get("replayed")
 
-	log.Info("EndRecord: URL > ", originalUrl.String(), " with body: ", parsedBody)
-	//log.Info("Debug request follows (if nothing, errored out)")
-	//DebugRequest(originalReq)
+	log.Info("EndRecord: URL > ", originalUrl.String(), " with body: ", payload)
 
 	if replayed == "true" {
 		log.Info("This was a replayed request.")
 		return
 	}
 
-	/*
-	err := request.ParseForm()
-	if err != nil {
-		log.Info("Problem parsing form: ", err)
-	}
-
-	var bodyRequest []byte
-	bodyRequest, err = ioutil.ReadAll(request.Body)
-	if err != nil {
-		log.Info("Problem reading bytes of request body: ", err)
-	}
-	bodyString := string(bodyRequest)
-
-	log.Info(fmt.Sprintf("1: {%v}, 2: {%v}, 3: {%v}", request.Form.Encode(), request.PostForm.Encode(), bodyString))
-	*/
-
 	//payload := originalUrl.RawQuery 		// TODO: Order? If both raw query and form entries given, use both? Test both.
-	payload := parsedBody
 
-	postFormEntries := request.PostForm.Encode()
-	if len(postFormEntries) > 0 {
-		payload += "&" + postFormEntries
-	}
+	//postFormEntries := request.PostForm.Encode()
+	//if len(postFormEntries) > 0 {
+	//	payload += "&" + postFormEntries
+	//}
+	//
+	//log.Info("Post form entries: ", postFormEntries)
 
-	fullPath := originalUrl.String() + postFormEntries
+	fullPath := originalUrl.String()
 
 	escPayload := string(json.RawMessage(payload))
 
@@ -84,7 +66,7 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 	url["Host"] = request.URL.Host
 	url["Path"] = fullPath // Previously originalUrl.String()	// Previously request.URL.Path
 	url["Payload"] = escPayload
-	url["PayloadExists"] = payload
+
 	header := make(map[string]string)
 	for key, value := range request.Header {
 		header[key] = strings.Join(value, ",")
@@ -101,10 +83,10 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 	}
 
 	req := &redisCache.Request{
-		Method:   "GET",
+		Method:   request.Method,
 		URL:      url,
 		Header:   header,
-		Host:     request.Host,
+		Host:     request.Host,		// Proxied host?
 		Form:     form,
 		PostForm: postForm,
 	}

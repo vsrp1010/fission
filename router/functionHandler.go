@@ -31,11 +31,11 @@ import (
 	"github.com/fission/fission/crd"
 	executorClient "github.com/fission/fission/executor/client"
 	"github.com/sirupsen/logrus"
-	"github.com/fission/fission/redis"
 	"strings"
 	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"bytes"
+	"github.com/fission/fission/redis"
 )
 
 type functionHandler struct {
@@ -88,15 +88,18 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	var originalUrl url.URL
 	originalUrl = *req.URL
 
-	p := make([]byte, 48)
-	buf, _ := ioutil.ReadAll(req.Body)
-	rdr1 := ioutil.NopCloser(bytes.NewBuffer(buf))
-	rdr2 := ioutil.NopCloser(bytes.NewBuffer(buf))
+	var postedBody string
+	if req.Method == http.MethodPost {
+		p := make([]byte, req.ContentLength)			// Will this always work?
+		buf, _ := ioutil.ReadAll(req.Body)
+		rdr1 := ioutil.NopCloser(bytes.NewBuffer(buf))
+		rdr2 := ioutil.NopCloser(bytes.NewBuffer(buf))
 
-	rdr1.Read(p)
-	postedBody := string(p)
-	logrus.Info(fmt.Sprintf("%v", postedBody))
-	req.Body = rdr2
+		rdr1.Read(p)
+		postedBody = string(p)
+		logrus.Info(fmt.Sprintf("%v", postedBody))
+		req.Body = rdr2
+	}
 
 	// Metrics stuff
 	startTime := time.Now()
