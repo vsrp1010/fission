@@ -9,7 +9,18 @@ import (
 	"github.com/fission/fission/redis/build/gen"
 	"strings"
 	"net/url"
+	"fmt"
+	"net/http/httputil"
+	"encoding/json"
 )
+
+func DebugRequest(request http.Request) {
+	dump, err := httputil.DumpRequest(&request, true)
+	if err != nil {
+		log.Info(err)
+	}
+	log.Info(fmt.Sprintf("%q", dump))
+}
 
 func NewClient() redis.Conn {
 	// TODO: Load redis ClusterIP from environment variable / configmap
@@ -20,7 +31,7 @@ func NewClient() redis.Conn {
 	return c
 }
 
-func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, originalUrl url.URL, response *http.Response, namespace string, timestamp int64) {
+func EndRecord(triggerName string, recorderName string, reqUID string, request *http.Request, originalUrl url.URL, parsedBody string, response *http.Response, namespace string, timestamp int64) {
 	// Case where the function should not have been recorded
 	if len(reqUID) == 0 {
 		return
@@ -28,18 +39,52 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 
 	replayed := originalUrl.Query().Get("replayed")
 
-	log.Info("EndRecord: URL > ", originalUrl.String(), " with queries ", replayed)
+	log.Info("EndRecord: URL > ", originalUrl.String(), " with body: ", parsedBody)
+	//log.Info("Debug request follows (if nothing, errored out)")
+	//DebugRequest(originalReq)
 
 	if replayed == "true" {
 		log.Info("This was a replayed request.")
 		return
 	}
 
+	/*
+	err := request.ParseForm()
+	if err != nil {
+		log.Info("Problem parsing form: ", err)
+	}
+
+	var bodyRequest []byte
+	bodyRequest, err = ioutil.ReadAll(request.Body)
+	if err != nil {
+		log.Info("Problem reading bytes of request body: ", err)
+	}
+	bodyString := string(bodyRequest)
+
+	log.Info(fmt.Sprintf("1: {%v}, 2: {%v}, 3: {%v}", request.Form.Encode(), request.PostForm.Encode(), bodyString))
+	*/
+
+	//payload := originalUrl.RawQuery 		// TODO: Order? If both raw query and form entries given, use both? Test both.
+	payload := parsedBody
+
+	postFormEntries := request.PostForm.Encode()
+	if len(postFormEntries) > 0 {
+		payload += "&" + postFormEntries
+	}
+
+	fullPath := originalUrl.String() + postFormEntries
+
+	escPayload := string(json.RawMessage(payload))
+
+	log.Info("Escaped payload parsed: ", escPayload, " and FullPath > ", fullPath)
+
 	client := NewClient()
 
 	url := make(map[string]string)
 	url["Host"] = request.URL.Host
-	url["Path"] = originalUrl.String()	// Previously request.URL.Path
+	url["Path"] = fullPath // Previously originalUrl.String()	// Previously request.URL.Path
+	url["Payload"] = escPayload
+	url["PayloadExists"] = payload
 	header := make(map[string]string)
 	for key, value := range request.Header {
 		header[key] = strings.Join(value, ",")

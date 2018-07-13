@@ -71,7 +71,7 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 	needTrack := len(triggers) == 0
 	trackFunction := make(map[string]bool)
 
-	//log.Info("New recorder ! Need track? ", needTrack)
+	log.Info("Creating/enabling recorder ! Need to track implicit triggers? ", needTrack)
 
 	rs.functionRecorderMap[function] = r
 	if needTrack {
@@ -93,8 +93,12 @@ func (rs *RecorderSet) newRecorder(r *crd.Recorder) {
 		}
 	}
 
+	// TODO: Should we force a reset here? If this is renabling a disabled recorder, we have to
+	// Reset doRecord
+	rs.parent.forceNewRouter()
+
 	log.Info("See updated trigger map: ", keys(rs.triggerRecorderMap))
-	//log.Info("See updated function map: ", keys(rs.functionRecorderMap))
+	log.Info("See updated function map: ", keys(rs.functionRecorderMap))
 }
 
 func keys(m map[string]*crd.Recorder) (keys []string) {
@@ -109,7 +113,7 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	function := r.Spec.Function
 	triggers := r.Spec.Triggers
 
-	log.Info("Disabling recorder !")
+	log.Info("Disabling recorder! ")
 
 	delete(rs.functionRecorderMap, function)		// Alternatively set the value to false
 
@@ -137,8 +141,7 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 
 func (rs *RecorderSet) updateRecorder(old *crd.Recorder, new *crd.Recorder) {
 	if new.Spec.Enabled == true {
-		//rs.disableRecorder(old)
-		rs.newRecorder(old)				// TODO: Test this
+		rs.newRecorder(new)				// TODO: Test this
 	} else {
 		rs.disableRecorder(old)
 	}

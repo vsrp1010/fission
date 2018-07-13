@@ -24,7 +24,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"time"
-
 	"github.com/gorilla/mux"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -35,6 +34,8 @@ import (
 	"github.com/fission/fission/redis"
 	"strings"
 	"github.com/satori/go.uuid"
+	"io/ioutil"
+	"bytes"
 )
 
 type functionHandler struct {
@@ -83,9 +84,19 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	var needExecutor, serviceUrlFromExecutor bool
 	var serviceUrl *url.URL
 
-	// TODO: Keep?
+	// TODO: Keep? --> Needed for queries encoded in URL before they're stripped by the proxy
 	var originalUrl url.URL
 	originalUrl = *req.URL
+
+	p := make([]byte, 48)
+	buf, _ := ioutil.ReadAll(req.Body)
+	rdr1 := ioutil.NopCloser(bytes.NewBuffer(buf))
+	rdr2 := ioutil.NopCloser(bytes.NewBuffer(buf))
+
+	rdr1.Read(p)
+	postedBody := string(p)
+	logrus.Info(fmt.Sprintf("%v", postedBody))
+	req.Body = rdr2
 
 	// Metrics stuff
 	startTime := time.Now()
@@ -191,7 +202,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 			redis.EndRecord(
 				trigger,
 				roundTripper.funcHandler.recorderName,
-				roundTripper.reqUID, req, originalUrl, resp, roundTripper.funcHandler.function.Namespace,
+				roundTripper.reqUID, req, originalUrl, postedBody, resp, roundTripper.funcHandler.function.Namespace,
 				time.Now().UnixNano(),
 				)
 			// return response back to user
