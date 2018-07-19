@@ -29,7 +29,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"github.com/fission/fission/fission/logdb"
@@ -39,6 +38,7 @@ type (
 	API struct {
 		fissionClient     *crd.FissionClient
 		kubernetesClient  *kubernetes.Clientset
+		redisUrl          string			// TODO: Store just the url to redis or full redis client here?
 		storageServiceUrl string
 		builderManagerUrl string
 		workflowApiUrl    string
@@ -83,6 +83,12 @@ func MakeAPI() (*API, error) {
 	} else {
 		api.functionNamespace = "fission-function"
 	}
+
+	rd := os.Getenv("REDIS_PORT_6379_TCP_ADDR")
+	rdport := os.Getenv("REDIS_PORT_6379_TCP_PORT")
+	if len(rd) > 0 && len(rdport) > 0{
+		api.redisUrl = fmt.Sprintf("%s:%s", rd, rdport)
+	}						// TODO: Else case?
 
 	return api, err
 }

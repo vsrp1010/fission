@@ -23,7 +23,7 @@ func replay(c *cli.Context) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 	for _, resp := range responses {
-		fmt.Fprintf(w, "%v\n",
+		fmt.Fprintf(w, "%v",
 			resp,
 		)
 	}

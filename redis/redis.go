@@ -9,24 +9,23 @@ import (
 	"github.com/fission/fission/redis/build/gen"
 	"strings"
 	"net/url"
-	"fmt"
-	"net/http/httputil"
 	"encoding/json"
+	"os"
+	"fmt"
 )
 
-func DebugRequest(request http.Request) {
-	dump, err := httputil.DumpRequest(&request, true)
-	if err != nil {
-		log.Info(err)
-	}
-	log.Info(fmt.Sprintf("%q", dump))
-}
-
 func NewClient() redis.Conn {
-	// TODO: Load redis ClusterIP from environment variable / configmap
-	c, err := redis.Dial("tcp", "10.102.223.159:6379")
+	rd := os.Getenv("REDIS_PORT_6379_TCP_ADDR")			// TODO: Do this here or somewhere earlier?
+	rdport := os.Getenv("REDIS_PORT_6379_TCP_PORT")
+	redisUrl := fmt.Sprintf("%s:%s", rd, rdport)
+
+	if len(redisUrl) == 0 {
+		log.Fatal("Could not reach Redis in cluster at IP ", redisUrl)
+	}
+
+	c, err := redis.Dial("tcp", redisUrl)
 	if err != nil {
-		log.Fatalf("Could not connect: %v\n", err)
+		log.Fatalf("Could not connect to Redis: %v\n", err)
 	}
 	return c
 }
@@ -36,7 +35,7 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 	if len(reqUID) == 0 {
 		return
 	}
-	replayed := originalUrl.Query().Get("replayed")
+	replayed := request.Header.Get("X-Fission-Replayed")
 
 	log.Info("EndRecord: URL > ", originalUrl.String(), " with body: ", payload)
 
@@ -44,15 +43,6 @@ func EndRecord(triggerName string, recorderName string, reqUID string, request *
 		log.Info("This was a replayed request.")
 		return
 	}
-
-	//payload := originalUrl.RawQuery 		// TODO: Order? If both raw query and form entries given, use both? Test both.
-
-	//postFormEntries := request.PostForm.Encode()
-	//if len(postFormEntries) > 0 {
-	//	payload += "&" + postFormEntries
-	//}
-	//
-	//log.Info("Post form entries: ", postFormEntries)
 
 	fullPath := originalUrl.String()
 

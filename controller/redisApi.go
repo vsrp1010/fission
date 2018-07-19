@@ -9,19 +9,17 @@ import (
 	"strings"
 	"time"
 	"strconv"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/gorilla/mux"
 	"github.com/golang/protobuf/proto"
-	"github.com/fission/fission/pkg/apis/fission.io/v1"
 	"github.com/fission/fission/redis/build/gen"
+	"github.com/gorilla/mux"
+	"github.com/fission/fission/pkg/apis/fission.io/v1"
 	"github.com/fission/fission/replayer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func NewClient() redis.Conn {
-	// TODO: Load redis ClusterIP from environment variable / configmap
+func NewClient(redisUrl string) redis.Conn {
 	// TODO: There are two of these functions in different packages -- import?
-	c, err := redis.Dial("tcp", "10.102.223.159:6379")
+	c, err := redis.Dial("tcp", redisUrl)
 	if err != nil {
 		log.Fatalf("Could not connect: %v\n", err)
 	}
@@ -33,10 +31,8 @@ func deserializeReqResponse(value []byte, reqUID string) (*redisCache.RecordedEn
 	data := &redisCache.UniqueRequest{}
 	err := proto.Unmarshal(value, data)
 	if err != nil {
-		// log.Fatal("Unmarshalling ReqResponse error: ", err)
 		return nil, err
 	}
-	//log.Info("Parsed protobuf bytes: ", data)
 	transformed := &redisCache.RecordedEntry{
 		ReqUID: reqUID,
 		Req: data.Req,
@@ -47,7 +43,7 @@ func deserializeReqResponse(value []byte, reqUID string) (*redisCache.RecordedEn
 }
 
 func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
-	client := NewClient()
+	client := NewClient(a.redisUrl)
 
 	iter := 0
 	var filtered []*redisCache.RecordedEntry		// Pointer?
@@ -55,11 +51,12 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 	for {
 		arr, err := redis.Values(client.Do("SCAN", iter))
 		if err != nil {
-			log.Fatal(err)		// TODO: Is this the right thing to do?
+			a.respondWithError(w, err) // TODO: Is this the right thing to do? Alternative: log.Fatal(err)
+			return
 		}
 		iter, _ = redis.Int(arr[0], nil)
-		k, _ := redis.Strings(arr[1], nil)
-		for _, key := range k {
+		keys, _ := redis.Strings(arr[1], nil)
+		for _, key := range keys {
 			if strings.HasPrefix(key, "REQ") {
 				val, err := redis.Bytes(client.Do("HGET", key, "ReqResponse"))
 				if err != nil {
@@ -86,18 +83,20 @@ func (a *API) RecordsApiListAll(w http.ResponseWriter, r *http.Request) {
 	a.respondWithSuccess(w, resp)
 }
 
+// Validates that time input follows formatting rules. Should be similar to 90h, 18s, 1d, etc.
 func validateSplit(timeInput string) (int64, time.Duration, error) {
 	num := timeInput[0:len(timeInput)-1]
 	unit := string(timeInput[len(timeInput)-1:])
 
 	num2, err := strconv.Atoi(num)
 	if err != nil {
-		return -1, time.Hour, err		// Return nil time struct?
+		return -1, time.Hour, errors.New("unsupported time format; use digits and choose unit from " +
+			"one of [s, m, h, d] for seconds, minutes, hours, and days respectively, example 90s")		// Return nil time struct?
 	}
 
 	num3 := int64(num2)
 
-	log.Info("Parsed time thusly: ", num3, unit, len(unit))
+	log.Info("Parsed time thus: ", num3, unit, len(unit))
 
 	switch unit {
 	case "s":
@@ -121,7 +120,6 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	fromInput := r.FormValue("from")
 	toInput := r.FormValue("to")
 
-	// TODO: Reduce duplicate code
 	fromMultiplier, fromUnit, err := validateSplit(fromInput)
 	if err != nil {
 		a.respondWithError(w, err)
@@ -135,15 +133,14 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
-	then := now.Add(time.Duration(-fromMultiplier) * fromUnit)
+	then := now.Add(time.Duration(-fromMultiplier) * fromUnit)		// Start search interval
 	rangeStart := then.UnixNano()
 
-	until := now.Add(time.Duration(-toMultiplier) * toUnit)
+	until := now.Add(time.Duration(-toMultiplier) * toUnit)			// End search interval
 	rangeEnd := until.UnixNano()
 
-	log.Info("Searching interval, from: ", then, ", to: ", until)
 
-	client := NewClient()
+	client := NewClient(a.redisUrl)
 
 	iter := 0
 	var filtered []*redisCache.RecordedEntry
@@ -151,15 +148,16 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	for {
 		arr, err := redis.Values(client.Do("SCAN", iter))
 		if err != nil {
-			log.Fatal(err)		// TODO: Is this the right thing toInput do?
+			a.respondWithError(w, err) // TODO: Is this the right thing to do? Alternative: log.Fatal(err)
+			return
 		}
 		iter, _ = redis.Int(arr[0], nil)
-		k, _ := redis.Strings(arr[1], nil)
-		for _, key := range k {
+		keys, _ := redis.Strings(arr[1], nil)
+		for _, key := range keys {
 			if strings.HasPrefix(key, "REQ") {
 				val, err := redis.Strings(client.Do("HMGET", key, "Timestamp"))
 				if err != nil {
-					log.Fatal(err)
+					log.Fatal(err)		// TODO: Is this the right thing to do here?
 					// return err
 				}
 				tsO, _ := strconv.Atoi(val[0])				// TODO: Get int64 precision fromInput here
@@ -191,13 +189,89 @@ func (a *API) RecordsApiFilterByTime(w http.ResponseWriter, r *http.Request) {
 	a.respondWithSuccess(w, resp)
 }
 
-
+// TODO: Streamline
 func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	trigger := vars["trigger"]
+	queried := vars["trigger"]
 
-	//trigger := a.extractQueryParamFromRequest(r, "trigger")
-	log.Info("In redisApi, got trigger: ", trigger)
+	ns := a.extractQueryParamFromRequest(r, "namespace")
+	if len(ns) == 0 {
+		ns = metav1.NamespaceAll
+	}
+
+	// Find the function this triggerName is associated with by searching the trigger store for a matching trigger
+	// and getting its functionReference. Afterwards filter recorders by this function, look them up on Redis, and return only the ReqUIDs
+	// with queried trigger in their Trigger field
+
+	triggers, err := a.fissionClient.HTTPTriggers(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	var correspFunction string
+	for _, trigger := range triggers.Items {
+		if trigger.Metadata.Name == queried {
+			correspFunction = trigger.Spec.FunctionReference.Name
+		}
+	}
+
+	recorders, err := a.fissionClient.Recorders(metav1.NamespaceAll).List(metav1.ListOptions{})
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+
+	var matchingRecorders []string
+	for _, recorder := range recorders.Items {
+		if recorder.Spec.Function == correspFunction {
+			matchingRecorders = append(matchingRecorders, recorder.Spec.Name)
+		}
+	}
+
+	client := NewClient(a.redisUrl)
+
+	var filtered []*redisCache.RecordedEntry
+
+	// TODO: Account for old/not-yet-deleted entries in the recorder lists
+	// Perhaps create a goroutine for cleaning up these missing values
+	for _, key := range matchingRecorders {
+		val, err := redis.Strings(client.Do("LRANGE", key, "0", "-1"))   // TODO: Prefix that distinguishes recorder lists
+		if err != nil {
+			// TODO: Handle deleted recorder? Or is this a non-issue because our list of recorders is up to date?
+			a.respondWithError(w, err)
+		}
+		for _, reqUID := range val {
+			val, err := redis.Strings(client.Do("HMGET", reqUID, "Trigger"))  // 1-to-1 reqUID - trigger?
+			if err != nil {
+				log.Fatal(err)
+			}
+			if val[0] == queried {
+				// TODO: Reconsider multiple commands
+				val, err := redis.Bytes(client.Do("HGET", reqUID, "ReqResponse"))
+				if err != nil {
+					log.Fatal(err)
+				}
+				entry, err := deserializeReqResponse(val, reqUID)
+				if err != nil {
+					log.Fatal(err)
+				}
+				filtered = append(filtered, entry)
+			}
+		}
+	}
+
+	resp, err := json.Marshal(filtered)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
+	a.respondWithSuccess(w, resp)
+}
+
+func (a *API) RecordsApiFilterByTrigger2(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	trigger := vars["trigger"]
 
 	ns := a.extractQueryParamFromRequest(r, "namespace")
 	if len(ns) == 0 {
@@ -224,7 +298,7 @@ func (a *API) RecordsApiFilterByTrigger(w http.ResponseWriter, r *http.Request) 
 	// For each matching recorder, for all its corresponding reqUIDs, if the value's Trigger field == queried trigger,
 	// add that reqUID to filtered list
 
-	client := NewClient()
+	client := NewClient(a.redisUrl)
 
 	var filtered []*redisCache.RecordedEntry
 
@@ -296,7 +370,7 @@ func (a *API) RecordsApiFilterByFunction(w http.ResponseWriter, r *http.Request)
 	}
 	log.Info("Matching recorders: ", matchingRecorders)
 
-	client := NewClient()
+	client := NewClient(a.redisUrl)
 
 	//var filteredReqUIDs []string
 	var filtered []*redisCache.RecordedEntry
@@ -340,10 +414,8 @@ func (a *API) ReplayByReqUID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	query := vars["reqUID"]
 
-	log.Info("In controller, asked to replay: ", query)
-
 	// Namespace?
-	client := NewClient()
+	client := NewClient(a.redisUrl)
 
 	exists, err := redis.Int(client.Do("EXISTS", query))
 	if exists != 1 || err != nil {

@@ -89,7 +89,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	originalUrl = *req.URL
 
 	var postedBody string
-	if req.Method == http.MethodPost {
+	if req.ContentLength > 0 {
 		p := make([]byte, req.ContentLength)			// Will this always work?
 		buf, _ := ioutil.ReadAll(req.Body)
 		rdr1 := ioutil.NopCloser(bytes.NewBuffer(buf))
@@ -194,9 +194,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 
 			trigger := ""		// TODO: Better default, test case
 			if roundTripper.funcHandler.httpTrigger != nil {		// TODO: Duplicate check from above?
-				if len(roundTripper.funcHandler.httpTrigger.Spec.RelativeURL) != 0 {
-					trigger = roundTripper.funcHandler.httpTrigger.Metadata.Name
-				}
+				trigger = roundTripper.funcHandler.httpTrigger.Metadata.Name	// TODO: Not accurate information
 			} else {
 				log.Println("No trigger attached.")	// Wording?
 			}
@@ -258,6 +256,8 @@ func (fh *functionHandler) handler(responseWriter http.ResponseWriter, request *
 	var reqUID string
 	if fh.httpTrigger != nil {
 		log.Print(fh.httpTrigger.Spec.RelativeURL)
+	} else {
+		log.Print("This function handler detected no associated trigger.")
 	}
 
 	if fh.recorderName != "" {

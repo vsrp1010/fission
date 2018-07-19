@@ -113,9 +113,10 @@ func (rs *RecorderSet) disableRecorder(r *crd.Recorder) {
 	function := r.Spec.Function
 	triggers := r.Spec.Triggers
 
-	log.Info("Disabling recorder! ")
+	log.Info("Disabling recorder!")
 
-	delete(rs.functionRecorderMap, function)		// Alternatively set the value to false
+	// Account for function
+	delete(rs.functionRecorderMap, function)
 
 	// Account for explicitly added triggers
 	if len(triggers) != 0 {

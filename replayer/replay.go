@@ -12,26 +12,32 @@ import (
 
 // Make return value a proper Response object
 func ReplayRequest(request *redisCache.Request) ([]string, error) {
-
-	// Localhost?
-	// URL should already be mapped
-	// Router port is 31314
-
 	path := request.URL["Path"]	// Slash included
 	payload := request.URL["Payload"]
 
-	targetUrl := fmt.Sprintf("http://192.168.64.8:31314%v", path)
+	targetUrl := fmt.Sprintf("http://35.193.91.244%v", path)
 
 	log.Info("Payload > ", payload)
 
-	targetUrl += "?replayed=true"	// TODO: Append url queries if provided, otherwise will be invalid (?)
+	// TODO: Make this a header
 
 	var resp *http.Response
 	var err error
+	client := http.DefaultClient
 	if request.Method == http.MethodGet {
-		resp, err = http.Get(targetUrl)
-	} else if request.Method == http.MethodPost {
-		resp, err = http.Post(targetUrl, "application/json", bytes.NewReader([]byte(payload)))
+		req, err := http.NewRequest("GET", targetUrl, nil)
+		if err != nil {
+			return []string{}, err
+		}
+		req.Header.Add("X-Fission-Replayed", "true")
+		resp, err = client.Do(req)
+	} else {
+		req, err := http.NewRequest(request.Method, targetUrl, bytes.NewReader([]byte(payload)))
+		if err != nil {
+			return []string{}, err
+		}
+		req.Header.Add("X-Fission-Replayed", "true")
+		resp, err = client.Do(req)
 	}
 
 	if err != nil {
@@ -45,8 +51,6 @@ func ReplayRequest(request *redisCache.Request) ([]string, error) {
 	}
 
 	bodyStr := string(body)
-
-	log.Info("GOT THIS BODY! ", bodyStr)
 
 	return []string{bodyStr}, nil
 }
