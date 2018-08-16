@@ -227,6 +227,7 @@ func main() {
 
 	// Replay records
 	reqIDFlag := cli.StringFlag{Name: "requid", Usage: "Replay a particular request by providing the reqUID (to view reqUIDs, do `fission records view`)"}
+	debugFlag := cli.BoolFlag{Name: "debug", Usage:"Connect to a debug process for this request"}
 
 	// environments
 	envNameFlag := cli.StringFlag{Name: "name", Usage: "Environment name"}
@@ -309,7 +310,7 @@ func main() {
 		{Name: "mqtrigger", Aliases: []string{"mqt", "messagequeue"}, Usage: "Manage message queue triggers for functions", Subcommands: mqtSubcommands},
 		{Name: "recorder", Usage: "Manage recorders for functions", Subcommands: recSubcommands, Hidden: true},
 		{Name: "records", Usage: "View records with optional filters", Subcommands: recViewSubcommands, Hidden: true},
-		{Name: "replay", Usage: "Replay records", Flags: []cli.Flag{reqIDFlag}, Action: replay},
+		{Name: "replay", Usage: "Replay records", Flags: []cli.Flag{reqIDFlag, debugFlag}, Action: replay},
 		{Name: "environment", Aliases: []string{"env"}, Usage: "Manage environments", Subcommands: envSubcommands},
 		{Name: "watch", Aliases: []string{"w"}, Usage: "Manage watches", Subcommands: wSubCommands},
 		{Name: "package", Aliases: []string{"pkg"}, Usage: "Manage packages", Subcommands: pkgSubCommands},

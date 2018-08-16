@@ -248,6 +248,9 @@ type (
 		// Runtime container image etc.; required
 		Runtime Runtime `json:"runtime"`
 
+		// Optional, runtime debug container image
+		DebugRuntime Runtime `json:"debugruntime"`
+
 		// Optional
 		Builder Builder `json:"builder"`
 

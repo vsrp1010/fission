@@ -74,6 +74,7 @@ func envCreate(c *cli.Context) error {
 	if len(envImg) == 0 {
 		log.Fatal("Need an image, use --image.")
 	}
+	envDebugImg := c.String("debug-image")
 
 	envVersion := c.Int("version")
 	envBuilderImg := c.String("builder")
@@ -112,6 +113,9 @@ func envCreate(c *cli.Context) error {
 			Version: envVersion,
 			Runtime: fission.Runtime{
 				Image: envImg,
+			},
+			DebugRuntime: fission.Runtime{
+				Image: envDebugImg,
 			},
 			Builder: fission.Builder{
 				Image:   envBuilderImg,
@@ -174,6 +178,7 @@ func envUpdate(c *cli.Context) error {
 	envNamespace := c.String("envNamespace")
 
 	envImg := c.String("image")
+	envDebugImg := c.String("debug-image")
 	envBuilderImg := c.String("builder")
 	envBuildCmd := c.String("buildcmd")
 	envExternalNetwork := c.Bool("externalnetwork")
@@ -190,6 +195,10 @@ func envUpdate(c *cli.Context) error {
 
 	if len(envImg) > 0 {
 		env.Spec.Runtime.Image = envImg
+	}
+	
+	if len(envDebugImg) > 0 {
+		env.Spec.DebugRuntime.Image = envDebugImg
 	}
 
 	if env.Spec.Version == 1 && (len(envBuilderImg) > 0 || len(envBuildCmd) > 0) {
@@ -252,10 +261,10 @@ func envList(c *cli.Context) error {
 	checkErr(err, "list environments")
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", "NAME", "UID", "IMAGE", "POOLSIZE", "MINCPU", "MAXCPU", "MINMEMORY", "MAXMEMORY", "EXTNET", "GRACETIME")
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n", "NAME", "UID", "IMAGE", "DEBUGIMAGE", "POOLSIZE", "MINCPU", "MAXCPU", "MINMEMORY", "MAXMEMORY", "EXTNET", "GRACETIME")
 	for _, env := range envs {
-		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
-			env.Metadata.Name, env.Metadata.UID, env.Spec.Runtime.Image, env.Spec.Poolsize,
+		fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\t%v\n",
+			env.Metadata.Name, env.Metadata.UID, env.Spec.Runtime.Image, env.Spec.DebugRuntime.Image, env.Spec.Poolsize,
 			env.Spec.Resources.Requests.Cpu(), env.Spec.Resources.Limits.Cpu(),
 			env.Spec.Resources.Requests.Memory(), env.Spec.Resources.Limits.Memory(),
 			env.Spec.AllowAccessToExternalNetwork, env.Spec.TerminationGracePeriod)
