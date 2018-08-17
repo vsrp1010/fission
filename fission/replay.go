@@ -28,9 +28,21 @@ import (
 func replay(c *cli.Context) error {
 	fc := getClient(c.GlobalString("server"))
 
-	reqUID := c.String("reqUID")
+	reqUID := c.String("requid")
 	if len(reqUID) == 0 {
 		log.Fatal("Need a reqUID, use --reqUID flag to specify")
+	}
+
+	debug := c.Bool("debug")
+	if debug {
+		// For now all this does is tell the executor it wants a new pod running the appropriate debug image
+		// and returns the service IP to the user; the user must manually connect to it through port-forwarding
+		svcIP, err := fc.SpecializeDebugPod(reqUID)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Printf("Connect to debug process @%v\n\n", svcIP)
+		}
 	}
 
 	responses, err := fc.ReplayByReqUID(reqUID)

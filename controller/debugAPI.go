@@ -13,35 +13,38 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package client
+package controller
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/fission/fission/redis"
 )
 
-func (c *Client) ReplayByReqUID(reqUID string) ([]string, error) {
-	relativeUrl := fmt.Sprintf("replay/%v", reqUID)
+func (a *API) DebugGet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	query := vars["reqUID"]
 
-	resp, err := http.Get(c.url(relativeUrl))
+	functions, err := a.fissionClient.Functions(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		a.respondWithError(w, err)
+		return
 	}
 
-	defer resp.Body.Close()
-
-	body, err := c.handleResponse(resp)
+	environments, err := a.fissionClient.Environments(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		a.respondWithError(w, err)
+		return
 	}
 
-	replayed := make([]string, 0)
-
-	err = json.Unmarshal(body, &replayed)
+	resp, err := redis.DebugByReqUID(query, functions, environments)
 	if err != nil {
-		return nil, err
+		a.respondWithError(w, err)
+		return
 	}
 
-	return replayed, nil
+	a.respondWithSuccess(w, resp)
 }

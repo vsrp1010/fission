@@ -16,32 +16,32 @@ limitations under the License.
 package client
 
 import (
-	"encoding/json"
 	"fmt"
+	"encoding/json"
 	"net/http"
 )
 
-func (c *Client) ReplayByReqUID(reqUID string) ([]string, error) {
-	relativeUrl := fmt.Sprintf("replay/%v", reqUID)
+func (c *Client) SpecializeDebugPod(reqUID string) (string, error) {
+	// Finds the environment this request was served from and
+	// obtain the corresponding debug image
+	relativeUrl := fmt.Sprintf("debug/%v", reqUID)
 
 	resp, err := http.Get(c.url(relativeUrl))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-
 	defer resp.Body.Close()
 
 	body, err := c.handleResponse(resp)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	replayed := make([]string, 0)
-
-	err = json.Unmarshal(body, &replayed)
+	var svcIP string
+	err = json.Unmarshal(body, &svcIP)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return replayed, nil
+	return svcIP, nil
 }

@@ -196,7 +196,7 @@ func envUpdate(c *cli.Context) error {
 	if len(envImg) > 0 {
 		env.Spec.Runtime.Image = envImg
 	}
-	
+
 	if len(envDebugImg) > 0 {
 		env.Spec.DebugRuntime.Image = envDebugImg
 	}
