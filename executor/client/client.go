@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/fission/fission"
+	"fmt"
 )
 
 type Client struct {
@@ -47,8 +48,14 @@ func MakeClient(executorUrl string) *Client {
 	return c
 }
 
-func (c *Client) GetServiceForFunction(metadata *metav1.ObjectMeta) (string, error) {
-	executorUrl := c.executorUrl + "/v2/getServiceForFunction"
+func (c *Client) GetServiceForFunction(metadata *metav1.ObjectMeta, debugImage string) (string, error) {
+	var executorUrl string
+	log.Print("In executor client, getSvcForFn, debugImg > ", debugImage)
+	if len(debugImage) > 0 {
+		executorUrl = c.executorUrl + fmt.Sprintf("/v2/getServiceForFunction?debug=%v", debugImage)
+	} else {
+		executorUrl = c.executorUrl + "/v2/getServiceForFunction"
+	}
 
 	body, err := json.Marshal(metadata)
 	if err != nil {

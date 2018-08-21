@@ -419,29 +419,29 @@ func ReplayRequest(routerUrl string, request *redisCache.Request) ([]string, err
 	return []string{bodyStr}, nil
 }
 
-func DebugByReqUID(queriedID string, functions *crd.FunctionList, environments *crd.EnvironmentList) ([]byte, error) {
+func DebugByReqUID(queriedID string, functions *crd.FunctionList, environments *crd.EnvironmentList) (string, string, error) {
 	client := NewClient()
 	if client == nil {
-		return nil, errors.New("failed to create redis client")
+		return "", "", errors.New("failed to create redis client")
 	}
 
 	// TODO: Reduce duplicate code
 	exists, err := redis.Int(client.Do("EXISTS", queriedID))
 	if exists != 1 || err != nil {
 		log.Error("couldn't find request to replay")
-		return nil, err
+		return "", "", err
 	}
 
 	val, err := redis.Bytes(client.Do("HGET", queriedID, "ReqResponse"))
 	if err != nil {
 		log.Error("couldn't obtain ReqResponse for this ID")
-		return nil, err
+		return "", "", err
 	}
 
 	entry, err := deserializeReqResponse(val, queriedID)
 	if err != nil {
 		log.Error("couldn't deserialize ReqResponse")
-		return nil, err
+		return "", "", err
 	}
 
 	correspFn := entry.Req.Header["X-Fission-Function-Name"]
@@ -455,7 +455,7 @@ func DebugByReqUID(queriedID string, functions *crd.FunctionList, environments *
 	}
 
 	if len(correspEnv) == 0 {
-		return nil, errors.New("couldn't find environment for the request")
+		return "", "", errors.New("couldn't find environment for the request")
 	}
 
 	var debugImg string
@@ -467,14 +467,10 @@ func DebugByReqUID(queriedID string, functions *crd.FunctionList, environments *
 	}
 
 	if len(debugImg) == 0 {
-		return nil, errors.New("couldn't find debug image for the request's environment")
+		return "", "", errors.New("couldn't find debug image for the request's environment")
 	}
 
 	log.Info("Debug Image > ", debugImg)
-	resp, err := json.Marshal(debugImg)
-	if err != nil {
-		return nil, err
-	}
 
-	return resp, nil
+	return debugImg, correspFn, nil
 }

@@ -51,6 +51,7 @@ type (
 	}
 	createFuncServiceRequest struct {
 		funcMeta *metav1.ObjectMeta
+		imageToUse string
 		respChan chan *createFuncServiceResponse
 	}
 
@@ -86,6 +87,9 @@ func (executor *Executor) serveCreateFuncServices() {
 	for {
 		req := <-executor.requestChan
 		m := req.funcMeta
+		imageToUse := req.imageToUse
+
+		log.Print("In executor, serveCreateFnServices, identified imageToUse > ", imageToUse)
 
 		// Cache miss -- is this first one to request the func?
 		wg, found := executor.fsCreateWg[crd.CacheKey(m)]
@@ -99,7 +103,7 @@ func (executor *Executor) serveCreateFuncServices() {
 			// launch a goroutine for each request, to parallelize
 			// the specialization of different functions
 			go func() {
-				fsvc, err := executor.createServiceForFunction(m)
+				fsvc, err := executor.createServiceForFunction(m, imageToUse)
 				req.respChan <- &createFuncServiceResponse{
 					funcSvc: fsvc,
 					err:     err,
@@ -138,7 +142,7 @@ func (executor *Executor) getFunctionExecutorType(meta *metav1.ObjectMeta) (fiss
 	return fn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType, nil
 }
 
-func (executor *Executor) createServiceForFunction(meta *metav1.ObjectMeta) (*fscache.FuncSvc, error) {
+func (executor *Executor) createServiceForFunction(meta *metav1.ObjectMeta, imageToUse string) (*fscache.FuncSvc, error) {
 	log.Printf("[%v] No cached function service found, creating one", meta.Name)
 
 	// from Func -> get Env
@@ -148,9 +152,17 @@ func (executor *Executor) createServiceForFunction(meta *metav1.ObjectMeta) (*fs
 		return nil, err
 	}
 
+
 	executorType, err := executor.getFunctionExecutorType(meta)
 	if err != nil {
 		return nil, err
+	}
+
+	// Override if debug option specified
+	if len(imageToUse) > 0 {
+		executorType = fission.ExecutorTypeNewdeploy
+	} else {
+		log.Print("imageToUse was empty! going with exec type: ", executorType)
 	}
 
 	var fsvc *fscache.FuncSvc
@@ -158,7 +170,8 @@ func (executor *Executor) createServiceForFunction(meta *metav1.ObjectMeta) (*fs
 
 	switch executorType {
 	case fission.ExecutorTypeNewdeploy:
-		fsvc, fsvcErr = executor.ndm.GetFuncSvc(meta)
+		log.Printf("[%v] spinning up new deploy with debugImageToUse: %v /end", meta.Name, imageToUse)
+		fsvc, fsvcErr = executor.ndm.GetFuncSvc(meta, imageToUse)
 	default:
 		pool, err := executor.gpm.GetPool(env)
 		if err != nil {

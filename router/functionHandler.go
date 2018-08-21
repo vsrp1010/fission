@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -30,7 +29,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/fission/fission"
@@ -108,7 +107,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 
 			rdr1.Read(p)
 			postedBody = string(p)
-			logrus.Info(fmt.Sprintf("%v", postedBody))
+			log.Info(fmt.Sprintf("%v", postedBody))
 			req.Body = rdr2
 		}
 	}
@@ -145,9 +144,15 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 		if needExecutor {
 			log.Printf("Calling getServiceForFunction for function: %s", roundTripper.funcHandler.function.Name)
 
-			// send a request to executor to specialize a new pod
+			debugImg := req.Header.Get("X-Fission-Replay-Debug")
+
+			log.Info("In router functionHandler roundTrip, debugImg > ", debugImg)
+
 			service, err := roundTripper.funcHandler.executor.GetServiceForFunction(
-				roundTripper.funcHandler.function)
+					roundTripper.funcHandler.function, debugImg)
+
+			log.Info("SVC withOUT debug > ", service)
+
 			if err != nil {
 				// We might want a specific error code or header for fission failures as opposed to
 				// user function bugs.

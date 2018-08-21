@@ -65,6 +65,7 @@ type (
 
 	fnRequest struct {
 		reqType         requestType
+		imageToUse      string
 		fn              *crd.Function
 		responseChannel chan *fnResponse
 	}
@@ -166,9 +167,10 @@ func (deploy *NewDeploy) initFuncController() (k8sCache.Store, k8sCache.Controll
 func (deploy *NewDeploy) service() {
 	for {
 		req := <-deploy.requestChannel
+		imageToUse := req.imageToUse
 		switch req.reqType {
 		case FnCreate:
-			fsvc, err := deploy.fnCreate(req.fn)
+			fsvc, err := deploy.fnCreate(req.fn, imageToUse)
 			req.responseChannel <- &fnResponse{
 				error: err,
 				fSvc:  fsvc,
@@ -186,7 +188,7 @@ func (deploy *NewDeploy) service() {
 	}
 }
 
-func (deploy *NewDeploy) GetFuncSvc(metadata *metav1.ObjectMeta) (*fscache.FuncSvc, error) {
+func (deploy *NewDeploy) GetFuncSvc(metadata *metav1.ObjectMeta, imageToUse string) (*fscache.FuncSvc, error) {
 	c := make(chan *fnResponse)
 	fn, err := deploy.fissionClient.Functions(metadata.Namespace).Get(metadata.Name)
 	if err != nil {
@@ -210,6 +212,7 @@ func (deploy *NewDeploy) GetFuncSvc(metadata *metav1.ObjectMeta) (*fscache.FuncS
 	deploy.requestChannel <- &fnRequest{
 		fn:              fn,
 		reqType:         FnCreate,
+		imageToUse:      imageToUse,
 		responseChannel: c,
 	}
 
@@ -269,7 +272,7 @@ func (deploy *NewDeploy) deleteFunction(fn *crd.Function) {
 	}
 }
 
-func (deploy *NewDeploy) fnCreate(fn *crd.Function) (*fscache.FuncSvc, error) {
+func (deploy *NewDeploy) fnCreate(fn *crd.Function, imageToUse string) (*fscache.FuncSvc, error) {
 	fsvc, err := deploy.fsCache.GetByFunction(&fn.Metadata)
 	if err == nil {
 		return fsvc, err
@@ -280,6 +283,10 @@ func (deploy *NewDeploy) fnCreate(fn *crd.Function) (*fscache.FuncSvc, error) {
 		Get(fn.Spec.Environment.Name)
 	if err != nil {
 		return fsvc, err
+	}
+
+	if len(imageToUse) == 0 {
+		imageToUse = env.Spec.Runtime.Image
 	}
 
 	objName := deploy.getObjName(fn)
@@ -305,7 +312,7 @@ func (deploy *NewDeploy) fnCreate(fn *crd.Function) (*fscache.FuncSvc, error) {
 	}
 	svcAddress := fmt.Sprintf("%v.%v", svc.Name, svc.Namespace)
 
-	depl, err := deploy.createOrGetDeployment(fn, env, objName, deployLabels, ns)
+	depl, err := deploy.createOrGetDeployment(fn, env, objName, deployLabels, ns, imageToUse)
 	if err != nil {
 		log.Printf("Error creating the deployment %v: %v", objName, err)
 		return fsvc, err
@@ -390,7 +397,7 @@ func (deploy *NewDeploy) fnUpdate(oldFn *crd.Function, newFn *crd.Function) {
 		if oldFn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType != fission.ExecutorTypeNewdeploy &&
 			newFn.Spec.InvokeStrategy.ExecutionStrategy.ExecutorType == fission.ExecutorTypeNewdeploy {
 			log.Printf("function type changed to new deployment, creating resources: %v", newFn)
-			_, err := deploy.fnCreate(newFn)
+			_, err := deploy.fnCreate(newFn, "")
 			if err != nil {
 				updateStatus(oldFn, err, "error changing the function's type to newdeploy")
 			}
@@ -477,7 +484,7 @@ func (deploy *NewDeploy) fnUpdate(oldFn *crd.Function, newFn *crd.Function) {
 		deployName := deploy.getObjName(oldFn)
 		deployLabels := deploy.getDeployLabels(oldFn, env)
 		log.Printf("updating %v deployment due to function %v update", deployName, newFn.Metadata.Name)
-		newDeployment, err := deploy.getDeploymentSpec(newFn, env, deployName, deployLabels)
+		newDeployment, err := deploy.getDeploymentSpec(newFn, env, deployName, deployLabels, "")			// TODO: Fix
 		if err != nil {
 			updateStatus(oldFn, err, "failed to get new deployment spec while updating function")
 			return

@@ -32,6 +32,10 @@ import (
 )
 
 func (executor *Executor) getServiceForFunctionApi(w http.ResponseWriter, r *http.Request) {
+	//vars := mux.Vars(r)
+	//debugImg := vars["debug"]
+	debugImg := r.FormValue("debug")
+
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Failed to read request", http.StatusInternalServerError)
@@ -46,7 +50,10 @@ func (executor *Executor) getServiceForFunctionApi(w http.ResponseWriter, r *htt
 		return
 	}
 
-	serviceName, err := executor.getServiceForFunction(&m)
+	log.Print("In executor getSvcForFnAPI, debugImg > ", debugImg)
+
+	serviceName, err := executor.getServiceForFunction(&m, debugImg)
+
 	if err != nil {
 		code, msg := fission.GetHTTPError(err)
 		log.Printf("Error: %v: %v", code, msg)
@@ -66,7 +73,7 @@ func (executor *Executor) getServiceForFunctionApi(w http.ResponseWriter, r *htt
 // stale addresses are not returned to the router.
 // To make it optimal, plan is to add an eager cache invalidator function that watches for pod deletion events and
 // invalidates the cache entry if the pod address was cached.
-func (executor *Executor) getServiceForFunction(m *metav1.ObjectMeta) (string, error) {
+func (executor *Executor) getServiceForFunction(m *metav1.ObjectMeta, debugImage string) (string, error) {
 	// Check function -> svc cache
 	log.Printf("[%v] Checking for cached function service", m.Name)
 	fsvc, err := executor.fsCache.GetByFunction(m)
@@ -80,9 +87,12 @@ func (executor *Executor) getServiceForFunction(m *metav1.ObjectMeta) (string, e
 		}
 	}
 
+	log.Print("In executor getSvcForFn, debugImage > ", debugImage)
+
 	respChan := make(chan *createFuncServiceResponse)
 	executor.requestChan <- &createFuncServiceRequest{
 		funcMeta: m,
+		imageToUse: debugImage,
 		respChan: respChan,
 	}
 	resp := <-respChan

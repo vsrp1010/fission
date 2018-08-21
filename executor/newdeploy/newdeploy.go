@@ -49,7 +49,7 @@ const (
 )
 
 func (deploy *NewDeploy) createOrGetDeployment(fn *crd.Function, env *crd.Environment,
-	deployName string, deployLabels map[string]string, deployNamespace string) (*v1beta1.Deployment, error) {
+	deployName string, deployLabels map[string]string, deployNamespace string, imageToUse string) (*v1beta1.Deployment, error) {
 
 	replicas := int32(fn.Spec.InvokeStrategy.ExecutionStrategy.MinScale)
 	if replicas == 0 {
@@ -70,7 +70,7 @@ func (deploy *NewDeploy) createOrGetDeployment(fn *crd.Function, env *crd.Enviro
 			return nil, err
 		}
 
-		deployment, err := deploy.getDeploymentSpec(fn, env, deployName, deployLabels)
+		deployment, err := deploy.getDeploymentSpec(fn, env, deployName, deployLabels, imageToUse)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func (deploy *NewDeploy) deleteDeployment(ns string, name string) error {
 }
 
 func (deploy *NewDeploy) getDeploymentSpec(fn *crd.Function, env *crd.Environment,
-	deployName string, deployLabels map[string]string) (*v1beta1.Deployment, error) {
+	deployName string, deployLabels map[string]string, imageToUse string) (*v1beta1.Deployment, error) {
 
 	replicas := int32(fn.Spec.InvokeStrategy.ExecutionStrategy.MinScale)
 	if replicas == 0 {
@@ -233,7 +233,7 @@ func (deploy *NewDeploy) getDeploymentSpec(fn *crd.Function, env *crd.Environmen
 					Containers: []apiv1.Container{
 						fission.MergeContainerSpecs(&apiv1.Container{
 							Name:                   fn.Metadata.Name,
-							Image:                  env.Spec.Runtime.Image,
+							Image:                  imageToUse,
 							ImagePullPolicy:        apiv1.PullIfNotPresent,
 							TerminationMessagePath: "/dev/termination-log",
 							VolumeMounts: []apiv1.VolumeMount{
