@@ -28,7 +28,7 @@ import (
 func replay(c *cli.Context) error {
 	fc := getClient(c.GlobalString("server"))
 
-	reqUID := c.String("requid")
+	reqUID := c.String("reqUID")
 	if len(reqUID) == 0 {
 		log.Fatal("Need a reqUID, use --reqUID flag to specify")
 	}

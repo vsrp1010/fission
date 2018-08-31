@@ -79,5 +79,7 @@ func (a *API) DebugGet(w http.ResponseWriter, r *http.Request) {
 		a.respondWithError(w, errors.New(fmt.Sprintf("failed to read response: %v", err)))
 	}
 
+	log.Printf("THIS IS SUPPOSED TO BE THE SERVICE > %v", string(body))
+
 	a.respondWithSuccess(w, body)
 }

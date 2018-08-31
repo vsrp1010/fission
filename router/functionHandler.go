@@ -19,6 +19,7 @@ package router
 import (
 	"bytes"
 	"fmt"
+	"encoding/json"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -160,11 +161,17 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 
 				log.Info("In RoundTrip with debugImage specified, got service: ", service)
 
+				jsonService, err := json.Marshal(service)
+				if err != nil {
+					// TODO: Handle this case appropriately
+					log.Info("Couldn't marshal service name to JSON: ", err)
+				}
+
 				if err == nil {
 					svcResp := &http.Response{
 					Status: "200 OK",
 					StatusCode: http.StatusOK,
-					Body: ioutil.NopCloser(bytes.NewBufferString(service)),
+					Body: ioutil.NopCloser(bytes.NewBufferString(string(jsonService))),
 					}
 
 					log.Info("In Roundtrip, svcResp: ", svcResp)
