@@ -13,6 +13,6 @@ COPY package.json /usr/src/app/
 RUN npm install && npm cache clean --force
 COPY server.js /usr/src/app/server.js
 
-CMD [ "npm", "start" ]
+CMD [ "node", "--inspect", "server.js" ]
 
 EXPOSE 8888

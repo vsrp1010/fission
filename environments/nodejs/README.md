@@ -43,3 +43,4 @@ Or, if you already have an environment, you can update its image:
 
 After this, fission functions that have the env parameter set to the
 same environment name as this command will use this environment.
+ 

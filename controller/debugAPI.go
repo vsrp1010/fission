@@ -17,6 +17,7 @@ package controller
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -68,6 +69,8 @@ func (a *API) DebugGet(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		a.respondWithError(w, errors.New(fmt.Sprintf("failed to fetch new debug pod service IP: %v", err)))
 	}
+
+	log.Print("In controller, after debug request made: ", resp.Status)
 
 	defer resp.Body.Close()
 

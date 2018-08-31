@@ -1,0 +1,11 @@
+debugger;
+module.exports = async function(context) {
+    console.log("Hi");
+    debugger;
+    console.log("Goodbye");
+    console.log("Now");
+    return {
+        status: 200,
+        body: "Hello, world!\n"
+    };
+}

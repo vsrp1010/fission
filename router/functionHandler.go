@@ -138,20 +138,40 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 		needExecutor = true
 	}
 
+	// TODO: Placement of following check
+	var debugImage string
+	debugImage = req.Header.Get("X-Fission-Replay-Debug")
+	log.Info("In router functionHandler roundTrip, debugImg > ", debugImage)
+	if len(debugImage) > 0 {
+		needExecutor = true
+	}
+
 	executingTimeout := roundTripper.funcHandler.tsRoundTripperParams.timeout
 
 	for i := 0; i < roundTripper.funcHandler.tsRoundTripperParams.maxRetries-1; i++ {
 		if needExecutor {
 			log.Printf("Calling getServiceForFunction for function: %s", roundTripper.funcHandler.function.Name)
 
-			debugImg := req.Header.Get("X-Fission-Replay-Debug")
-
-			log.Info("In router functionHandler roundTrip, debugImg > ", debugImg)
-
 			service, err := roundTripper.funcHandler.executor.GetServiceForFunction(
-					roundTripper.funcHandler.function, debugImg)
+					roundTripper.funcHandler.function, debugImage)
 
-			log.Info("SVC withOUT debug > ", service)
+			// Case where we only want the SVC IP returned, no need for proxying request
+			if len(debugImage) > 0 {
+
+				log.Info("In RoundTrip with debugImage specified, got service: ", service)
+
+				if err == nil {
+					svcResp := &http.Response{
+					Status: "200 OK",
+					StatusCode: http.StatusOK,
+					Body: ioutil.NopCloser(bytes.NewBufferString(service)),
+					}
+
+					log.Info("In Roundtrip, svcResp: ", svcResp)
+
+					return svcResp, nil
+				}
+			}
 
 			if err != nil {
 				// We might want a specific error code or header for fission failures as opposed to
@@ -224,7 +244,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 				log.Println("No trigger attached.") // Wording?
 			}
 
-			if len(roundTripper.funcHandler.recorderName) > 0 {
+			if len(roundTripper.funcHandler.recorderName) > 0 && len(debugImage) == 0 {
 				redis.Record(
 					trigger,
 					roundTripper.funcHandler.recorderName,
