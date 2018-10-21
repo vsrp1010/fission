@@ -190,11 +190,13 @@ func fnCreate(c *cli.Context) error {
 
 		srcArchiveName := c.StringSlice("src")
 		var deployArchiveName []string
+		codeFlag := false
 		code := c.String("code")
 		if len(code) == 0 {
 			deployArchiveName = c.StringSlice("deploy")
 		} else {
 			deployArchiveName = append(deployArchiveName, c.String("code"))
+			codeFlag = true
 		}
 		// fatal when both src & deploy archive are empty
 		if len(srcArchiveName) == 0 && len(deployArchiveName) == 0 {
@@ -204,7 +206,7 @@ func fnCreate(c *cli.Context) error {
 		buildcmd := c.String("buildcmd")
 
 		// create new package in the same namespace as the function.
-		pkgMetadata = createPackage(client, fnNamespace, envName, envNamespace, srcArchiveName, deployArchiveName, buildcmd, specFile)
+		pkgMetadata = createPackage(client, fnNamespace, envName, envNamespace, srcArchiveName, deployArchiveName, buildcmd, specFile, codeFlag)
 
 		fmt.Printf("package '%v' created\n", pkgMetadata.Name)
 	}
@@ -413,11 +415,13 @@ func fnUpdate(c *cli.Context) error {
 	}
 
 	var deployArchiveName []string
+	codeFlag := false
 	code := c.String("code")
 	if len(code) == 0 {
 		deployArchiveName = c.StringSlice("deploy")
 	} else {
 		deployArchiveName = append(deployArchiveName, c.String("code"))
+		codeFlag = true
 	}
 
 	srcArchiveName := c.StringSlice("src")
@@ -506,7 +510,7 @@ func fnUpdate(c *cli.Context) error {
 			log.Fatal("Package is used by multiple functions, use --force to force update")
 		}
 
-		pkgMetadata, err = updatePackage(client, pkg, envName, envNamespace, srcArchiveName, deployArchiveName, buildcmd, false)
+		pkgMetadata, err = updatePackage(client, pkg, envName, envNamespace, srcArchiveName, deployArchiveName, buildcmd, false, codeFlag)
 		util.CheckErr(err, fmt.Sprintf("update package '%v'", pkgName))
 
 		fmt.Printf("package '%v' updated\n", pkgMetadata.GetName())
