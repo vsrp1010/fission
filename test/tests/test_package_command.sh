@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
+source $(dirname $0)/mac_util.sh
 
 # Use package command to create two packages one with source
 # archive and the other with deploy archive. Also, create a 
