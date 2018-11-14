@@ -164,7 +164,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 	transport := http.DefaultTransport.(*http.Transport)
 
 	// Disables caching, Please refer to issue and specifically comment: https://github.com/fission/fission/issues/723#issuecomment-398781995
-	transport.DisableKeepAlives = true
+	//transport.DisableKeepAlives = true
 
 	executingTimeout := roundTripper.funcHandler.tsRoundTripperParams.timeout
 

@@ -220,6 +220,10 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	// Healthz endpoint for the router.
 	muxRouter.HandleFunc("/router-healthz", routerHealthHandler).Methods("GET")
 
+	// Close idle connections.
+	// Please refer to issue and specifically comment: https://github.com/fission/fission/issues/723#issuecomment-398781995
+	http.DefaultTransport.(*http.Transport).CloseIdleConnections()
+
 	return muxRouter
 }
 
