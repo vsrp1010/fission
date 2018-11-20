@@ -61,24 +61,34 @@ build_fission_bundle_image() {
     popd
 }
 
+build_specializer_image() {
+    local version=$1
+    local date=$2
+    local gitcommit=$3
+    local tag=fission/specializer:$version
+
+    pushd $DIR/environments/envsidecar/fetcher/cmd
+
+    ./build.sh $version $date $gitcommit
+    docker build -t $tag .
+    docker tag $tag fission/specializer:latest
+
+    popd
+}
+
 build_fetcher_image() {
     local version=$1
     local date=$2
     local gitcommit=$3
     local tag=fission/fetcher:$version
 
-    pushd $DIR/environments/fetcher/cmd
+    pushd $DIR/environments/envsidecar/fetcher/cmd
 
     ./build.sh $version $date $gitcommit
     docker build -t $tag .
     docker tag $tag fission/fetcher:latest
 
     popd    
-}
-
-push_fetcher_image() {
-    local version=$1
-    local tag=fission/fetcher:$version
 }
 
 build_builder_image() {
@@ -292,6 +302,7 @@ build_all() {
     mkdir -p $BUILDDIR
     
     build_fission_bundle_image $version $date $gitcommit
+    build_specializer_image $version $date $gitcommit
     build_fetcher_image $version $date $gitcommit
     build_builder_image $version $date $gitcommit
     build_logger_image $version

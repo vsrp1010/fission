@@ -21,6 +21,12 @@ pullPolicy: IfNotPresent
 ## Fission image version
 imageTag: 0.12.0
 
+## Fission specializer repository
+specializerImage: fission/fetcher
+
+## Fission specializer image version
+specializerImageTag: 0.12.0
+
 ## Fission fetcher repository
 fetcherImage: fission/fetcher
 

@@ -26,29 +26,11 @@ check_clean() {
     fi
 }
 
-# Push fission-bundle image
-push_fission_bundle_image() {
-    local version=$1
-    local tag=fission/fission-bundle:$version
-    docker push $tag
-}
-
-push_fetcher_image() {
-    local version=$1
-    local tag=fission/fetcher:$version
-    docker push $tag
-}
-
-
-push_builder_image() {
-    local version=$1
-    local tag=fission/builder:$version
-    docker push $tag
-}
-
-push_logger_image() {
-    local version=$1
-    local tag=fission/fluentd:$version
+# Push image
+push_image() {
+    local image=$1
+    local version=$2
+    local tag=fission/$image:$version
     docker push $tag
 }
 
@@ -132,17 +114,20 @@ push_pre_upgrade_checks_image() {
 
 push_all() {
     local version=$1
-    push_fission_bundle_image $version
-    push_fission_bundle_image latest
+    push_image "fission-bundle" $version
+    push_image "fission-bundle" latest
 
-    push_fetcher_image $version
-    push_fetcher_image latest
+    push_image "specializer" $version
+    push_image "specializer" latest
 
-    push_builder_image $version
-    push_builder_image latest
+    push_image "fetcher" $version
+    push_image "fetcher" latest
 
-    push_logger_image $version
-    push_logger_image latest
+    push_image "builder" $version
+    push_image "builder" latest
+
+    push_image "fluentd" $version
+    push_image "fluentd" latest
 
     push_pre_upgrade_checks_image $version
     push_pre_upgrade_checks_image latest
