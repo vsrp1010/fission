@@ -37,35 +37,35 @@ import (
 
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
-	fetcherClient "github.com/fission/fission/environments/fetcher/client"
+	specializerClient "github.com/fission/fission/environments/envsidecar/specializer/client"
 	"github.com/fission/fission/executor/fscache"
 	"github.com/fission/fission/executor/util"
 )
 
 type (
 	GenericPool struct {
-		env                    *crd.Environment
-		replicas               int32                         // num idle pods
-		deployment             *v1beta1.Deployment           // kubernetes deployment
-		namespace              string                        // namespace to keep our resources
-		functionNamespace      string                        // fallback namespace for fission functions
-		podReadyTimeout        time.Duration                 // timeout for generic pods to become ready
-		idlePodReapTime        time.Duration                 // pods unused for idlePodReapTime are deleted
-		fsCache                *fscache.FunctionServiceCache // cache funcSvc's by function, address and podname
-		useSvc                 bool                          // create k8s service for specialized pods
-		useIstio               bool
-		poolInstanceId         string // small random string to uniquify pod names
-		fetcherImage           string
-		fetcherImagePullPolicy apiv1.PullPolicy
-		runtimeImagePullPolicy apiv1.PullPolicy // pull policy for generic pool to created env deployment
-		kubernetesClient       *kubernetes.Clientset
-		fissionClient          *crd.FissionClient
-		instanceId             string // poolmgr instance id
-		labelsForPool          map[string]string
-		requestChannel         chan *choosePodRequest
-		sharedMountPath        string // used by generic pool when creating env deployment to specify the share volume path for fetcher & env
-		sharedSecretPath       string
-		sharedCfgMapPath       string
+		env                        *crd.Environment
+		replicas                   int32                         // num idle pods
+		deployment                 *v1beta1.Deployment           // kubernetes deployment
+		namespace                  string                        // namespace to keep our resources
+		functionNamespace          string                        // fallback namespace for fission functions
+		podReadyTimeout            time.Duration                 // timeout for generic pods to become ready
+		idlePodReapTime            time.Duration                 // pods unused for idlePodReapTime are deleted
+		fsCache                    *fscache.FunctionServiceCache // cache funcSvc's by function, address and podname
+		useSvc                     bool                          // create k8s service for specialized pods
+		useIstio                   bool
+		poolInstanceId             string // small random string to uniquify pod names
+		specializerImage           string
+		specializerImagePullPolicy apiv1.PullPolicy
+		runtimeImagePullPolicy     apiv1.PullPolicy // pull policy for generic pool to created env deployment
+		kubernetesClient           *kubernetes.Clientset
+		fissionClient              *crd.FissionClient
+		instanceId                 string // poolmgr instance id
+		labelsForPool              map[string]string
+		requestChannel             chan *choosePodRequest
+		sharedMountPath            string // used by generic pool when creating env deployment to specify the share volume path for fetcher & env
+		sharedSecretPath           string
+		sharedCfgMapPath           string
 	}
 
 	// serialize the choosing of pods so that choices don't conflict
@@ -103,13 +103,13 @@ func MakeGenericPool(
 
 	log.Printf("Creating pool for environment %v", env.Metadata)
 
-	fetcherImage := os.Getenv("FETCHER_IMAGE")
-	if len(fetcherImage) == 0 {
-		fetcherImage = "fission/fetcher"
+	specializerImage := os.Getenv("SPECIALIZER_IMAGE")
+	if len(specializerImage) == 0 {
+		specializerImage = "fission/specializer"
 	}
-	fetcherImagePullPolicy := os.Getenv("FETCHER_IMAGE_PULL_POLICY")
-	if len(fetcherImagePullPolicy) == 0 {
-		fetcherImagePullPolicy = "IfNotPresent"
+	specializerImagePullPolicy := os.Getenv("SPECIALIZER_IMAGE_PULL_POLICY")
+	if len(specializerImagePullPolicy) == 0 {
+		specializerImagePullPolicy = "IfNotPresent"
 	}
 	runtimeImagePullPolicy := os.Getenv("RUNTIME_IMAGE_PULL_POLICY")
 	if len(runtimeImagePullPolicy) == 0 {
@@ -131,7 +131,7 @@ func MakeGenericPool(
 		fsCache:           fsCache,
 		poolInstanceId:    uniuri.NewLen(8),
 		instanceId:        instanceId,
-		fetcherImage:      fetcherImage,
+		specializerImage:  specializerImage,
 		useSvc:            false,       // defaults off -- svc takes a second or more to become routable, slowing cold start
 		useIstio:          enableIstio, // defaults off -- istio integration requires pod relabeling and it takes a second or more to become routable, slowing cold start
 		sharedMountPath:   "/userfunc", // change this may break v1 compatibility, since most of the v1 environments have hard-coded "/userfunc" in loading path
@@ -141,8 +141,8 @@ func MakeGenericPool(
 
 	gp.runtimeImagePullPolicy = getImagePullPolicy(runtimeImagePullPolicy)
 
-	gp.fetcherImagePullPolicy = getImagePullPolicy(fetcherImagePullPolicy)
-	log.Printf("fetcher image: %v, pull policy: %v", gp.fetcherImage, gp.fetcherImagePullPolicy)
+	gp.specializerImagePullPolicy = getImagePullPolicy(specializerImagePullPolicy)
+	log.Printf("fetcher image: %v, pull policy: %v", gp.specializerImage, gp.specializerImagePullPolicy)
 
 	// create fetcher SA in this ns, if not already created
 	_, err := fission.SetupSA(gp.kubernetesClient, fission.FissionFetcherSA, gp.namespace)
@@ -392,7 +392,7 @@ func (gp *GenericPool) specializePod(pod *apiv1.Pod, metadata *metav1.ObjectMeta
 
 	log.Printf("[%v] specializing pod", metadata.Name)
 
-	err = fetcherClient.MakeClient(fetcherUrl).Specialize(&specializeReq)
+	err = specializerClient.MakeClient(fetcherUrl).Specialize(&specializeReq)
 	if err != nil {
 		return err
 	}
@@ -568,9 +568,9 @@ func (gp *GenericPool) createPool() error {
 							},
 						}, gp.env.Spec.Runtime.Container),
 						{
-							Name:                   "fetcher",
-							Image:                  gp.fetcherImage,
-							ImagePullPolicy:        gp.fetcherImagePullPolicy,
+							Name:                   "specializer",
+							Image:                  gp.specializerImage,
+							ImagePullPolicy:        gp.specializerImagePullPolicy,
 							TerminationMessagePath: "/dev/termination-log",
 							VolumeMounts: []apiv1.VolumeMount{
 								{
@@ -636,7 +636,7 @@ func (gp *GenericPool) createPool() error {
 							},
 						},
 					},
-					ServiceAccountName: "fission-fetcher",
+					ServiceAccountName: fission.FissionSpecializerSA,
 					// TerminationGracePeriodSeconds should be equal to the
 					// sleep time of preStop to make sure that SIGTERM is sent
 					// to pod after 6 mins.

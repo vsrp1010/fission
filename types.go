@@ -242,8 +242,9 @@ const (
 )
 
 const (
-	FissionBuilderSA = "fission-builder"
-	FissionFetcherSA = "fission-fetcher"
+	FissionBuilderSA     = "fission-builder"
+	FissionFetcherSA     = "fission-fetcher"
+	FissionSpecializerSA = "fission-specializer"
 
 	SecretConfigMapGetterCR = "secret-configmap-getter"
 	SecretConfigMapGetterRB = "secret-configmap-getter-binding"

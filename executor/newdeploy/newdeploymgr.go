@@ -51,13 +51,13 @@ type (
 		crdClient        *rest.RESTClient
 		instanceID       string
 
-		fetcherImg             string
-		fetcherImagePullPolicy apiv1.PullPolicy
-		namespace              string
-		sharedMountPath        string
-		sharedSecretPath       string
-		sharedCfgMapPath       string
-		useIstio               bool
+		specializerImage           string
+		specializerImagePullPolicy apiv1.PullPolicy
+		namespace                  string
+		sharedMountPath            string
+		sharedSecretPath           string
+		sharedCfgMapPath           string
+		useIstio                   bool
 
 		fsCache        *fscache.FunctionServiceCache // cache funcSvc's by function, address and podname
 		requestChannel chan *fnRequest
@@ -98,13 +98,13 @@ func MakeNewDeploy(
 
 	log.Printf("Creating NewDeploy ExecutorType")
 
-	fetcherImg := os.Getenv("FETCHER_IMAGE")
-	if len(fetcherImg) == 0 {
-		fetcherImg = "fission/fetcher"
+	specializerImage := os.Getenv("SPECIALIZER_IMAGE")
+	if len(specializerImage) == 0 {
+		specializerImage = "fission/specializer"
 	}
-	fetcherImagePullPolicy := os.Getenv("FETCHER_IMAGE_PULL_POLICY")
-	if len(fetcherImagePullPolicy) == 0 {
-		fetcherImagePullPolicy = "IfNotPresent"
+	specializerImagePullPolicy := os.Getenv("SPECIALIZER_IMAGE_PULL_POLICY")
+	if len(specializerImagePullPolicy) == 0 {
+		specializerImagePullPolicy = "IfNotPresent"
 	}
 
 	enableIstio := false
@@ -125,12 +125,12 @@ func MakeNewDeploy(
 		namespace: namespace,
 		fsCache:   fsCache,
 
-		fetcherImg:             fetcherImg,
-		fetcherImagePullPolicy: apiv1.PullIfNotPresent,
-		sharedMountPath:        "/userfunc",
-		sharedSecretPath:       "/secrets",
-		sharedCfgMapPath:       "/configs",
-		useIstio:               enableIstio,
+		specializerImage:           specializerImage,
+		specializerImagePullPolicy: apiv1.PullIfNotPresent,
+		sharedMountPath:            "/userfunc",
+		sharedSecretPath:           "/secrets",
+		sharedCfgMapPath:           "/configs",
+		useIstio:                   enableIstio,
 
 		requestChannel:  make(chan *fnRequest),
 		idlePodReapTime: 2 * time.Minute,

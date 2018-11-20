@@ -12,14 +12,14 @@ import (
 	"syscall"
 
 	"github.com/fission/fission"
-	"github.com/fission/fission/environments/fetcher"
+	"github.com/fission/fission/environments/envsidecar"
 )
 
 func dumpStackTrace() {
 	debug.PrintStack()
 }
 
-// Usage: fetcher <shared volume path>
+// Usage: specializer <shared volume path>
 func main() {
 	// register signal handler for dumping stack trace.
 	c := make(chan os.Signal, 1)
@@ -31,7 +31,7 @@ func main() {
 		os.Exit(1)
 	}()
 
-	flag.Usage = fetcherUsage
+	flag.Usage = specializerUsage
 	specializeOnStart := flag.Bool("specialize-on-startup", false, "Flag to activate specialize process at pod starup")
 	specializePayload := flag.String("-specialize-request", "", "JSON payload for specialize request")
 	secretDir := flag.String("secret-dir", "", "Path to shared secrets directory")
@@ -53,10 +53,12 @@ func main() {
 		}
 	}
 
-	f, err := fetcher.MakeFetcher(dir, *secretDir, *configDir)
+	f, err := envsidecar.MakeEnvSidecar(dir, *secretDir, *configDir)
 	if err != nil {
-		log.Fatalf("Error making fetcher: %v", err)
+		log.Fatalf("Error making specializer: %v", err)
 	}
+
+	var success bool
 
 	if *specializeOnStart {
 		var specializeReq fission.FunctionSpecializeRequest
@@ -78,13 +80,23 @@ func main() {
 	mux.HandleFunc("/upload", f.UploadHandler)
 	mux.HandleFunc("/version", f.VersionHandler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		var statusCode int
+
+		if *specializeOnStart {
+			if success {
+				statusCode = http.StatusOK
+			} else {
+				statusCode = http.StatusInternalServerError
+			}
+		}
+
+		w.WriteHeader(statusCode)
 	})
 
 	log.Println("Fetcher ready to receive requests")
 	http.ListenAndServe(":8000", mux)
 }
 
-func fetcherUsage() {
-	fmt.Printf("Usage: fetcher [-specialize-on-startup] [-fetch-request <json>] [-load-request <json>] [-secret-dir <string>] [-cfgmap-dir <string>] <shared volume path> \n")
+func specializerUsage() {
+	fmt.Printf("Usage: specializer [-specialize-on-startup] [-fetch-request <json>] [-load-request <json>] [-secret-dir <string>] [-cfgmap-dir <string>] <shared volume path> \n")
 }

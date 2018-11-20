@@ -244,7 +244,7 @@ func (a *API) FunctionPodLogs(w http.ResponseWriter, r *http.Request) {
 		return itime.After(jtime)
 	})
 
-	podLogOpts := apiv1.PodLogOptions{Container: envName} // Only the env container, not fetcher
+	podLogOpts := apiv1.PodLogOptions{Container: envName} // Only the env container, not specializer
 	var podLogsReq *restclient.Request
 	if len(pods) > 0 {
 		podLogsReq = a.kubernetesClient.CoreV1().Pods(ns).GetLogs(pods[0].ObjectMeta.Name, &podLogOpts)

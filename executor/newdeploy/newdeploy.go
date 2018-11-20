@@ -265,9 +265,9 @@ func (deploy *NewDeploy) getDeploymentSpec(fn *crd.Function, env *crd.Environmen
 							Resources: resources,
 						}, env.Spec.Runtime.Container),
 						{
-							Name:                   "fetcher",
-							Image:                  deploy.fetcherImg,
-							ImagePullPolicy:        deploy.fetcherImagePullPolicy,
+							Name:                   "specializer",
+							Image:                  deploy.specializerImage,
+							ImagePullPolicy:        deploy.specializerImagePullPolicy,
 							TerminationMessagePath: "/dev/termination-log",
 							VolumeMounts: []apiv1.VolumeMount{
 								{
@@ -328,7 +328,7 @@ func (deploy *NewDeploy) getDeploymentSpec(fn *crd.Function, env *crd.Environmen
 							},
 						},
 					},
-					ServiceAccountName:            "fission-fetcher",
+					ServiceAccountName:            fission.FissionSpecializerSA,
 					TerminationGracePeriodSeconds: &gracePeriodSeconds,
 				},
 			},

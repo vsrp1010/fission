@@ -24,22 +24,22 @@ import (
 )
 
 func GetFetcherResources() (v1.ResourceRequirements, error) {
-	mincpu, err := resource.ParseQuantity(os.Getenv("FETCHER_MINCPU"))
+	mincpu, err := resource.ParseQuantity(os.Getenv("SPECIALIZER_MINCPU"))
 	if err != nil {
 		return v1.ResourceRequirements{}, err
 	}
 
-	minmem, err := resource.ParseQuantity(os.Getenv("FETCHER_MINMEM"))
+	minmem, err := resource.ParseQuantity(os.Getenv("SPECIALIZER_MINMEM"))
 	if err != nil {
 		return v1.ResourceRequirements{}, err
 	}
 
-	maxcpu, err := resource.ParseQuantity(os.Getenv("FETCHER_MAXCPU"))
+	maxcpu, err := resource.ParseQuantity(os.Getenv("SPECIALIZER_MAXCPU"))
 	if err != nil {
 		return v1.ResourceRequirements{}, err
 	}
 
-	maxmem, err := resource.ParseQuantity(os.Getenv("FETCHER_MAXMEM"))
+	maxmem, err := resource.ParseQuantity(os.Getenv("SPECIALIZER_MAXMEM"))
 	if err != nil {
 		return v1.ResourceRequirements{}, err
 	}
