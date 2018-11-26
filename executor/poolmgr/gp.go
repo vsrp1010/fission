@@ -316,26 +316,6 @@ func (gp *GenericPool) getSpecializeUrl(podIP string) string {
 
 }
 
-//func (gp *GenericPool) getSpecializeUrl(podIP string, version int) string {
-//	u := os.Getenv("TEST_SPECIALIZE_URL")
-//	isv6 := IsIPv6(podIP)
-//	var baseUrl string
-//	if len(u) != 0 {
-//		return u
-//	}
-//	if isv6 == false {
-//		baseUrl = fmt.Sprintf("http://%v:8888", podIP)
-//	} else if isv6 == true { // We use bracket if the IP is in IPv6.
-//		baseUrl = fmt.Sprintf("http://[%v]:8888", podIP)
-//	}
-//
-//	if version == 1 {
-//		return fmt.Sprintf("%v/specialize", baseUrl)
-//	} else {
-//		return fmt.Sprintf("%v/v%v/specialize", baseUrl, version)
-//	}
-//}
-
 // specializePod chooses a pod, copies the required user-defined function to that pod
 // (via fetcher), and calls the function-run container to load it, resulting in a
 // specialized pod.
@@ -352,8 +332,8 @@ func (gp *GenericPool) specializePod(pod *apiv1.Pod, metadata *metav1.ObjectMeta
 	}
 
 	// tell fetcher to get the function.
-	fetcherUrl := gp.getSpecializeUrl(podIP)
-	log.Printf("[%v] calling fetcher to copy function with fetcher url: %v", metadata.Name, fetcherUrl)
+	specializerUrl := gp.getSpecializeUrl(podIP)
+	log.Printf("[%v] calling fetcher to copy function with fetcher url: %v", metadata.Name, specializerUrl)
 
 	fn, err := gp.fissionClient.
 		Functions(metadata.Namespace).
@@ -392,75 +372,10 @@ func (gp *GenericPool) specializePod(pod *apiv1.Pod, metadata *metav1.ObjectMeta
 
 	log.Printf("[%v] specializing pod", metadata.Name)
 
-	err = specializerClient.MakeClient(fetcherUrl).Specialize(&specializeReq)
+	err = specializerClient.MakeClient(specializerUrl).Specialize(&specializeReq)
 	if err != nil {
 		return err
 	}
-
-	// retry the specialize call a few times in case the env server hasn't come up yet
-	//maxRetries := 20
-	//
-	//loadReq := fission.FunctionLoadRequest{
-	//	FilePath:         filepath.Join(gp.sharedMountPath, targetFilename),
-	//	FunctionName:     fn.Spec.Package.FunctionName,
-	//	FunctionMetadata: &fn.Metadata,
-	//}
-
-	//body, err := json.Marshal(loadReq)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//for i := 0; i < maxRetries; i++ {
-	//	var resp2 *http.Response
-	//	if gp.env.Spec.Version == 2 {
-	//		specializeUrl := gp.getSpecializeUrl(podIP, 2)
-	//		log.Printf("specialize url: %v", specializeUrl)
-	//		resp2, err = http.Post(specializeUrl, "application/json", bytes.NewReader(body))
-	//	} else {
-	//		specializeUrl := gp.getSpecializeUrl(podIP, 1)
-	//		resp2, err = http.Post(specializeUrl, "text/plain", bytes.NewReader([]byte{}))
-	//	}
-	//
-	//	if err == nil && resp2.StatusCode < 300 {
-	//		// Success
-	//		resp2.Body.Close()
-	//		return nil
-	//	}
-	//
-	//	retry := false
-	//
-	//	// Only retry for the specific case of a connection error.
-	//	if urlErr, ok := err.(*url.Error); ok {
-	//		if netErr, ok := urlErr.Err.(*net.OpError); ok {
-	//			if netErr.Op == "dial" {
-	//				if i < maxRetries-1 {
-	//					retry = true
-	//				}
-	//			}
-	//		}
-	//	}
-	//
-	//	// Receive response with non-200 http code
-	//	if err == nil {
-	//		err = fission.MakeErrorFromHTTP(resp2)
-	//	}
-	//
-	//	// The istio-proxy block all http requests until it's ready
-	//	// to serve traffic. Retry if istio feature is enabled.
-	//	if gp.useIstio {
-	//		retry = true
-	//	}
-	//
-	//	if retry && i < maxRetries-1 {
-	//		time.Sleep(500 * time.Duration(2*i) * time.Millisecond)
-	//		log.Printf("Error connecting to pod (%v), retrying", err)
-	//		continue
-	//	}
-	//
-	//	log.Printf("Failed to specialize pod: %v", err)
-	//	return err
-	//}
 
 	return nil
 }
@@ -587,7 +502,7 @@ func (gp *GenericPool) createPool() error {
 								},
 							},
 							Resources: fetcherResources,
-							Command: []string{"/fetcher",
+							Command: []string{"/specializer",
 								"-secret-dir", gp.sharedSecretPath,
 								"-cfgmap-dir", gp.sharedCfgMapPath,
 								gp.sharedMountPath},
@@ -636,7 +551,7 @@ func (gp *GenericPool) createPool() error {
 							},
 						},
 					},
-					ServiceAccountName: fission.FissionSpecializerSA,
+					ServiceAccountName: fission.FissionFetcherSA,
 					// TerminationGracePeriodSeconds should be equal to the
 					// sleep time of preStop to make sure that SIGTERM is sent
 					// to pod after 6 mins.

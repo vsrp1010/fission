@@ -33,7 +33,7 @@ func main() {
 
 	flag.Usage = specializerUsage
 	specializeOnStart := flag.Bool("specialize-on-startup", false, "Flag to activate specialize process at pod starup")
-	specializePayload := flag.String("-specialize-request", "", "JSON payload for specialize request")
+	specializePayload := flag.String("specialize-request", "", "JSON payload for specialize request")
 	secretDir := flag.String("secret-dir", "", "Path to shared secrets directory")
 	configDir := flag.String("cfgmap-dir", "", "Path to shared configmap directory")
 
@@ -72,12 +72,12 @@ func main() {
 		if err != nil {
 			log.Fatalf("Error specialing function poadt: %v", err)
 		}
+
+		success = true
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/fetch", f.FetchHandler)
 	mux.HandleFunc("/specialize", f.SpecializeHandler)
-	mux.HandleFunc("/upload", f.UploadHandler)
 	mux.HandleFunc("/version", f.VersionHandler)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		var statusCode int
@@ -88,15 +88,17 @@ func main() {
 			} else {
 				statusCode = http.StatusInternalServerError
 			}
+		} else {
+			statusCode = http.StatusOK
 		}
 
 		w.WriteHeader(statusCode)
 	})
 
-	log.Println("Fetcher ready to receive requests")
+	log.Println("Specializer ready to receive requests")
 	http.ListenAndServe(":8000", mux)
 }
 
 func specializerUsage() {
-	fmt.Printf("Usage: specializer [-specialize-on-startup] [-fetch-request <json>] [-load-request <json>] [-secret-dir <string>] [-cfgmap-dir <string>] <shared volume path> \n")
+	fmt.Printf("Usage: specializer [-specialize-on-startup] [-specialize-request <json>] [-secret-dir <string>] [-cfgmap-dir <string>] <shared volume path> \n")
 }

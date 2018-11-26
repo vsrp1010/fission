@@ -1,6 +1,8 @@
 package client
 
 import (
+	"strings"
+
 	"github.com/fission/fission"
 	"github.com/fission/fission/environments/envsidecar"
 )
@@ -11,9 +13,9 @@ type (
 	}
 )
 
-func MakeClient(fetcherUrl string) *Client {
+func MakeClient(specializerUrl string) *Client {
 	return &Client{
-		url: fetcherUrl,
+		url: strings.TrimSuffix(specializerUrl, "/"),
 	}
 }
 

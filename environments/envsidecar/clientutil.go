@@ -37,7 +37,7 @@ func SendRequest(req interface{}, url string) ([]byte, error) {
 
 		if i < maxRetries-1 {
 			time.Sleep(50 * time.Duration(2*i) * time.Millisecond)
-			log.Printf("Error specialize/fetch/upload package (%v), retrying", err)
+			log.Printf("Error processing request to url %v (%v), retrying", url, err)
 			continue
 		}
 	}

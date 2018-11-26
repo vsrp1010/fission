@@ -156,7 +156,7 @@ func (es *EnvSidecar) ReadyToServe() bool {
 // FetchHandler is for env builder to fetch source archive only
 func (es *EnvSidecar) FetchHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "only POST is supported on this endpoint", http.StatusMethodNotAllowed)
+		http.Error(w, fmt.Sprintf("Only POST is supported on this endpoint: %v", r.Method), http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -204,7 +204,7 @@ func (es *EnvSidecar) FetchHandler(w http.ResponseWriter, r *http.Request) {
 
 func (es *EnvSidecar) SpecializeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "only POST is supported on this endpoint", http.StatusMethodNotAllowed)
+		http.Error(w, fmt.Sprintf("Only POST is supported on this endpoint: %v", r.Method), http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -412,7 +412,7 @@ func (es *EnvSidecar) FetchSecretsAndCfgMaps(secrets []fission.SecretReference, 
 
 func (es *EnvSidecar) UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
-		http.Error(w, "only POST is supported on this endpoint", http.StatusMethodNotAllowed)
+		http.Error(w, fmt.Sprintf("Only POST is supported on this endpoint: %v", r.Method), http.StatusMethodNotAllowed)
 		return
 	}
 

@@ -94,12 +94,6 @@ roleRef:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: fission-specializer
-  namespace: {{ .Values.functionNamespace }}
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
   name: fission-fetcher
   namespace: {{ .Values.functionNamespace }}
 ---

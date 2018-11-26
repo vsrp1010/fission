@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/fission/fission"
 	"github.com/fission/fission/environments/envsidecar"
@@ -15,7 +16,7 @@ type (
 
 func MakeClient(fetcherUrl string) *Client {
 	return &Client{
-		url: fetcherUrl,
+		url: strings.TrimSuffix(fetcherUrl, "/"),
 	}
 }
 

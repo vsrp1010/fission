@@ -1,5 +1,5 @@
 FROM alpine:3.4
 
-ADD fetcher /
+ADD specializer /
 
 EXPOSE 8000
